@@ -38,6 +38,8 @@ interface StockChartProps {
   companyName: string; // Añadido nombre de la empresa
 }
 
+const ALPHA_VANTAGE_API_KEY = "Z77KZQ17AVAUO1NW";
+
 const StockChart: React.FC<StockChartProps> = ({ ticker, companyName }) => {
   const [chartData, setChartData] = useState<ChartDataPoint[]>([]);
   const [chartStats, setChartStats] = useState<ChartStats | null>(null);
@@ -51,71 +53,33 @@ const StockChart: React.FC<StockChartProps> = ({ ticker, companyName }) => {
   }, [ticker]);
 
   const fetchChartData = async () => {
-    if (!ticker) return;
-    
     try {
-      setIsLoading(true);
-      // Verificar caché primero
-      const cachedData = localStorage.getItem(`chart_${ticker}`);
-      if (cachedData) {
-        const { data, timestamp } = JSON.parse(cachedData);
-        const now = new Date().getTime();
-        
-        // Si los datos están en caché y no han expirado (5 minutos), usarlos
-        if (now - timestamp < 5 * 60 * 1000) {
-          console.log(`Using cached chart data for ${ticker}`);
-          setChartData(data);
-          updateChartStats(data);
-          setIsLoading(false);
-          return;
-        }
-      }
-      
       console.log(`Fetching chart data for ${ticker}...`);
-      const apiKey = import.meta.env.VITE_ALPHA_VANTAGE_API_KEY;
       
-      if (!apiKey) {
-        console.error('API key is not defined');
-        setError('API key is not configured');
-        return;
-      }
-      
-      const url = `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${ticker}&apikey=${apiKey}`;
-      console.log('API URL:', url);
-      
-      const response = await fetch(url);
+      const response = await fetch(
+        `https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=${ticker}&apikey=${ALPHA_VANTAGE_API_KEY}`
+      );
       
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
       
       const data = await response.json();
-      console.log('API Response:', data);
       
-    
+      if (data.Note) {
+        console.error('API Error:', data.Note);
+        return null;
+      }
       
-      const quote = data['Global Quote'];
-      const chartData = [{
-        date: quote['07. latest trading day'],
-        close: parseFloat(quote['05. price'])
-      }];
+      if (!data['Time Series (Daily)']) {
+        console.error('No time series data found');
+        return null;
+      }
       
-      console.log('Processed chart data:', chartData);
-      
-      // Guardar en caché
-      localStorage.setItem(`chart_${ticker}`, JSON.stringify({
-        data: chartData,
-        timestamp: new Date().getTime()
-      }));
-      
-      setChartData(chartData);
-      updateChartStats(chartData);
-      setError(null);
+      return data;
     } catch (error) {
-      console.error(`Error fetching chart data for ${ticker}:`, error);
-      setError('Error fetching data. Please try again later.');
-    } finally {
-      setIsLoading(false);
+      console.error('Error fetching chart data:', error);
+      return null;
     }
   };
 

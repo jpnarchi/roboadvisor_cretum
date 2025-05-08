@@ -89,12 +89,29 @@ interface StockData {
   overview?: CompanyOverview;
 }
 
+interface PortfolioTrendData {
+  Weight: string;
+  Ticker: string;
+  Name: string;
+  Price: string;
+  Currency: string;
+  "Market Capitalization": string;
+  Sector: string;
+  Rating: string;
+  "Rated On": string;
+  "Since Rated": string;
+  "Smart Momentum": number;
+  Retracement: string;
+  "Trend Strength": number;
+}
+
 const RightPanel: React.FC<RightPanelProps> = ({ selectedCompany, selectedTicker }) => {
   const [stockData, setStockData] = useState<StockData | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [aiRecommendation, setAiRecommendation] = useState<AIRecommendation | null>(null);
   const [isLoadingAI, setIsLoadingAI] = useState(false);
+  const [portfolioTrend, setPortfolioTrend] = useState<PortfolioTrendData | null>(null);
   const contentRef = useRef<HTMLDivElement>(null);
 
   const handleExport = async () => {
@@ -215,10 +232,113 @@ const RightPanel: React.FC<RightPanelProps> = ({ selectedCompany, selectedTicker
     fetchAIRecommendation();
   }, [selectedTicker]);
 
+  useEffect(() => {
+    const fetchPortfolioTrend = async () => {
+      if (!selectedTicker) return;
+      
+      // Reset portfolio trend when ticker changes
+      setPortfolioTrend(null);
+      console.log('Fetching portfolio trend for:', selectedTicker);
+      
+      try {
+        const response = await fetch('/portfolio_trend.json');
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const text = await response.text();
+        console.log('Raw response:', text.substring(0, 200) + '...');
+        
+        let data;
+        try {
+          // Remove any BOM characters and trim whitespace
+          const cleanText = text.replace(/^\uFEFF/, '').trim();
+          // Replace NaN with null in the JSON string
+          const sanitizedText = cleanText.replace(/: NaN/g, ': null');
+          data = JSON.parse(sanitizedText);
+        } catch (parseError) {
+          console.error('Error parsing JSON:', parseError);
+          throw new Error('Invalid JSON format');
+        }
+
+        // Find the stock trend
+        const stockTrend = data.find((item: any) => item.Ticker === selectedTicker);
+        if (stockTrend) {
+          // Create a new object with the correct types and ensure Rating is uppercase
+          const typedStockTrend: PortfolioTrendData = {
+            Weight: String(stockTrend.Weight || "0.00%"),
+            Ticker: String(stockTrend.Ticker),
+            Name: String(stockTrend.Name || ""),
+            Price: String(stockTrend.Price || "N/A"),
+            Currency: String(stockTrend.Currency || "USD"),
+            "Market Capitalization": String(stockTrend["Market Capitalization"] || "N/A"),
+            Sector: String(stockTrend.Sector || "N/A"),
+            Rating: String(stockTrend.Rating || "N/A").toUpperCase(),
+            "Rated On": stockTrend["Rated On"] ? String(stockTrend["Rated On"]) : new Date().toISOString().split('T')[0],
+            "Since Rated": String(stockTrend["Since Rated"] || "0%"),
+            "Smart Momentum": Number(stockTrend["Smart Momentum"] || 0),
+            Retracement: String(stockTrend.Retracement || "0%"),
+            "Trend Strength": Number(stockTrend["Trend Strength"] || 0)
+          };
+          
+          console.log('Found stock trend:', typedStockTrend);
+          setPortfolioTrend(typedStockTrend);
+        } else {
+          console.log('No stock trend found for:', selectedTicker);
+          // Set default trend if no data found
+          const defaultTrend: PortfolioTrendData = {
+            Weight: "0.00%",
+            Ticker: selectedTicker,
+            Name: selectedCompany || "",
+            Price: "N/A",
+            Currency: "USD",
+            "Market Capitalization": "N/A",
+            Sector: "N/A",
+            Rating: "N/A",
+            "Rated On": new Date().toISOString().split('T')[0],
+            "Since Rated": "0%",
+            "Smart Momentum": 0,
+            Retracement: "0%",
+            "Trend Strength": 0
+          };
+          setPortfolioTrend(defaultTrend);
+        }
+      } catch (error) {
+        console.error('Error processing portfolio trend:', error);
+        // Set default trend on error
+        const defaultTrend: PortfolioTrendData = {
+          Weight: "0.00%",
+          Ticker: selectedTicker,
+          Name: selectedCompany || "",
+          Price: "N/A",
+          Currency: "USD",
+          "Market Capitalization": "N/A",
+          Sector: "N/A",
+          Rating: "N/A",
+          "Rated On": new Date().toISOString().split('T')[0],
+          "Since Rated": "0%",
+          "Smart Momentum": 0,
+          Retracement: "0%",
+          "Trend Strength": 0
+        };
+        setPortfolioTrend(defaultTrend);
+      }
+    };
+
+    // Execute immediately when ticker changes
+    fetchPortfolioTrend();
+    
+    // Set up interval for updates
+    const intervalId = setInterval(fetchPortfolioTrend, 30000);
+
+    // Clean up interval
+    return () => clearInterval(intervalId);
+  }, [selectedTicker, selectedCompany]);
+
   const getRatingBackground = (rating: string | undefined) => {
-    if (!rating) return 'from-gray-500/5 border-gray-500/30';
-    const firstChar = rating.charAt(0);
-    switch (firstChar) {
+    if (!rating || rating === 'N/A') return 'from-gray-500/5 border-gray-500/30';
+    const upperRating = rating.toUpperCase();
+    switch (upperRating.charAt(0)) {
       case 'A': return 'from-green-400/5 border-green-400/30';
       case 'B': return 'from-blue-400/5 border-blue-400/30';
       case 'C': return 'from-yellow-400/5 border-yellow-400/30';
@@ -228,9 +348,9 @@ const RightPanel: React.FC<RightPanelProps> = ({ selectedCompany, selectedTicker
   };
 
   const getRatingColor = (rating: string | undefined) => {
-    if (!rating) return 'text-gray-500';
-    const firstChar = rating.charAt(0);
-    switch (firstChar) {
+    if (!rating || rating === 'N/A') return 'text-gray-500';
+    const upperRating = rating.toUpperCase();
+    switch (upperRating.charAt(0)) {
       case 'A': return 'text-green-400';
       case 'B': return 'text-blue-400';
       case 'C': return 'text-yellow-400';
@@ -309,12 +429,12 @@ const RightPanel: React.FC<RightPanelProps> = ({ selectedCompany, selectedTicker
                   <p className="text-2xl font-bold text-white mt-1">{stockData.overview?.AnalystTargetPrice || 'N/A'}</p>
                 </div>
                 {!isLoading && stockData && (
-                  <div className={`glass-panel p-4 rounded-xl border bg-gradient-to-br to-transparent backdrop-blur-lg shadow-glow ${getRatingBackground(stockData.Rating)}`}>
+                  <div className={`glass-panel p-4 rounded-xl border bg-gradient-to-br to-transparent backdrop-blur-lg shadow-glow ${getRatingBackground(portfolioTrend?.Rating)}`}>
                     <span className="text-sm uppercase tracking-wider text-[#b9d6ee]/70 font-medium">Rating</span>
-                    <div className={`text-2xl font-black mt-1 ${getRatingColor(stockData.Rating)}`}>
-                      {stockData.Rating || 'N/A'}
+                    <div className={`text-2xl font-black mt-1 ${getRatingColor(portfolioTrend?.Rating)}`}>
+                      {portfolioTrend?.Rating || 'N/A'}
                       <div className="text-xs text-[#b9d6ee]/50 font-medium">
-                        {stockData["Rated On"] ? `Rated ${stockData["Rated On"]}` : 'Not rated'}
+                        {portfolioTrend?.["Rated On"] ? `Rated ${portfolioTrend["Rated On"]}` : 'Not rated'}
                       </div>
                     </div>
                   </div>
