@@ -10,11 +10,14 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "chart.js": "^4.4.1",
+    "@supabase/supabase-js": "^2.49.4",
+    "@types/pdfjs-dist": "^2.10.377",
+    "chart.js": "^4.4.9",
     "html2pdf.js": "^0.10.1",
     "lucide-react": "^0.330.0",
+    "pdfjs-dist": "^5.2.133",
     "react": "^18.2.0",
-    "react-chartjs-2": "^5.2.0",
+    "react-chartjs-2": "^5.3.0",
     "react-dom": "^18.2.0",
     "react-markdown": "^9.0.1",
     "react-toastify": "^10.0.4",

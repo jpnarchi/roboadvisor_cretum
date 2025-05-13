@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, TrendingUp, ArrowUpRight, ArrowDownRight } from 'lucide-react';
+import { Search } from 'lucide-react';
 import RightPanel from './components/RightPanel';
 import { updateData, getLastUpdateTime } from './services/dataService';
 import { toast } from 'react-toastify';
@@ -7,10 +7,13 @@ import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { updateCompanyData, getCompanyData } from './services/companyService';
 import AIAssistant from './components/AIAssistant';
+import MarketReports from './components/MarketReports';
+import StockTicker from './components/StockTicker';
 
 interface StockData {
   symbol: string;
   name: string;
+  market: 'US' | 'XETRA' | 'LSE' | 'TSX' | 'TSXV' | 'BSE' | 'SSE' | 'SZSE';
   change?: number;
   price?: number;
   loading?: boolean;
@@ -18,50 +21,86 @@ interface StockData {
 }
 
 const stockTickers: StockData[] = [
-  { symbol: 'AAPL', name: 'Apple Inc.' },
-  { symbol: 'MSFT', name: 'Microsoft Corporation' },
-  { symbol: 'GOOGL', name: 'Alphabet Inc.' },
-  { symbol: 'AMZN', name: 'Amazon.com Inc.' },
-  { symbol: 'NVDA', name: 'NVIDIA Corporation' },
-  { symbol: 'META', name: 'Meta Platforms Inc.' },
-  { symbol: 'TSLA', name: 'Tesla Inc.' },
-  { symbol: 'JPM', name: 'JPMorgan Chase & Co.' },
-  { symbol: 'V', name: 'Visa Inc.' },
-  { symbol: 'WMT', name: 'Walmart Inc.' },
-  { symbol: 'JNJ', name: 'Johnson & Johnson' },
-  { symbol: 'MA', name: 'Mastercard Inc.' },
-  { symbol: 'PG', name: 'Procter & Gamble Co.' },
-  { symbol: 'HD', name: 'Home Depot Inc.' },
-  { symbol: 'BAC', name: 'Bank of America Corp.' }
+  // US Stocks (NYSE/NASDAQ)
+  { symbol: 'IBM', name: 'International Business Machines Corporation', market: 'US' },
+  { symbol: 'MSFT', name: 'Microsoft Corporation', market: 'US' },
+  { symbol: 'AMZN', name: 'Amazon.com Inc.', market: 'US' },
+  { symbol: 'GOOGL', name: 'Alphabet Inc.', market: 'US' },
+  { symbol: 'META', name: 'Meta Platforms Inc.', market: 'US' },
+  { symbol: 'BRK.B', name: 'Berkshire Hathaway Inc.', market: 'US' },
+  { symbol: 'SPY', name: 'SPDR S&P 500 ETF Trust', market: 'US' },
+  { symbol: 'TCEHY', name: 'Tencent Holdings Ltd.', market: 'US' },
+  { symbol: 'BABA', name: 'Alibaba Group Holding Ltd.', market: 'US' },
+  { symbol: 'LVMUY', name: 'LVMH Moët Hennessy Louis Vuitton', market: 'US' },
+  { symbol: 'UBER', name: 'Uber Technologies Inc.', market: 'US' },
+  { symbol: 'RTX', name: 'Raytheon Technologies Corporation', market: 'US' },
+  { symbol: 'LMT', name: 'Lockheed Martin Corporation', market: 'US' },
+  { symbol: 'INTC', name: 'Intel Corporation', market: 'US' },
+  { symbol: 'ABNB', name: 'Airbnb Inc.', market: 'US' },
+  { symbol: 'RSP', name: 'Invesco S&P 500 Equal Weight ETF', market: 'US' },
+  { symbol: 'COIN', name: 'Coinbase Global Inc.', market: 'US' },
+  { symbol: 'TLT', name: 'iShares 20+ Year Treasury Bond ETF', market: 'US' },
+  { symbol: 'BIDU', name: 'Baidu Inc.', market: 'US' },
+  { symbol: 'EL', name: 'Estée Lauder Companies Inc.', market: 'US' },
+  { symbol: 'PINS', name: 'Pinterest Inc.', market: 'US' },
+  { symbol: 'PARA', name: 'Paramount Global', market: 'US' },
+  { symbol: 'QLD', name: 'ProShares Ultra QQQ', market: 'US' },
+  { symbol: 'DJT', name: 'DJT Corporation', market: 'US' },
+  { symbol: 'TMF', name: 'Direxion Daily 20+ Year Treasury Bull 3x Shares', market: 'US' },
+  { symbol: 'EWZ', name: 'iShares MSCI Brazil ETF', market: 'US' },
+  
+  // German Stocks (XETRA)
+  { symbol: 'MBG.DEX', name: 'Mercedes-Benz Group AG', market: 'XETRA' },
+  { symbol: 'DHER.DEX', name: 'Deutsche Börse AG', market: 'XETRA' },
+  { symbol: 'SMSN.DEX', name: 'Siemens AG', market: 'XETRA' },
+  { symbol: 'POAHY.DEX', name: 'Porsche Automobil Holding SE', market: 'XETRA' },
+  { symbol: 'BMW.DEX', name: 'BMW AG', market: 'XETRA' },
+  { symbol: 'SAP.DEX', name: 'SAP SE', market: 'XETRA' },
+  
+  // UK Stocks (London Stock Exchange)
+  { symbol: 'TSCO.LON', name: 'Tesco PLC', market: 'LSE' },
+  { symbol: 'BT.A.LON', name: 'BT Group plc', market: 'LSE' },
+  { symbol: 'HSBA.LON', name: 'HSBC Holdings plc', market: 'LSE' },
+  { symbol: 'BP.LON', name: 'BP p.l.c.', market: 'LSE' },
+  { symbol: 'VOD.LON', name: 'Vodafone Group Plc', market: 'LSE' },
+  
+  // Canadian Stocks (Toronto Stock Exchange)
+  { symbol: 'SHOP.TRT', name: 'Shopify Inc.', market: 'TSX' },
+  { symbol: 'RY.TRT', name: 'Royal Bank of Canada', market: 'TSX' },
+  { symbol: 'TD.TRT', name: 'Toronto-Dominion Bank', market: 'TSX' },
+  { symbol: 'CNR.TRT', name: 'Canadian National Railway Company', market: 'TSX' },
+  
+  // Canadian Stocks (Toronto Venture Exchange)
+  { symbol: 'GPV.TRV', name: 'GreenPower Motor Company Inc.', market: 'TSXV' },
+  
+  // Indian Stocks (BSE)
+  { symbol: 'RELIANCE.BSE', name: 'Reliance Industries Limited', market: 'BSE' },
+  { symbol: 'TCS.BSE', name: 'Tata Consultancy Services Limited', market: 'BSE' },
+  { symbol: 'HDFCBANK.BSE', name: 'HDFC Bank Limited', market: 'BSE' },
+  { symbol: 'INFY.BSE', name: 'Infosys Limited', market: 'BSE' },
+  
+  // Chinese Stocks (Shanghai Stock Exchange)
+  { symbol: '600104.SHH', name: 'SAIC Motor Corporation Limited', market: 'SSE' },
+  { symbol: '601318.SHH', name: 'Ping An Insurance (Group) Company of China, Ltd.', market: 'SSE' },
+  { symbol: '600519.SHH', name: 'Kweichow Moutai Co., Ltd.', market: 'SSE' },
+  
+  // Chinese Stocks (Shenzhen Stock Exchange)
+  { symbol: '000002.SHZ', name: 'China Vanke Co., Ltd.', market: 'SZSE' },
+  { symbol: '000651.SHZ', name: 'Gree Electric Appliances Inc. of Zhuhai', market: 'SZSE' },
+  { symbol: '000333.SHZ', name: 'Midea Group Co., Ltd.', market: 'SZSE' }
 ];
 
-const infiniteStockTickers = [...stockTickers, ...stockTickers];
 
 function App() {
   const [currentView, setCurrentView] = useState<'dashboard' | 'reports'>('dashboard');
   const [searchQuery, setSearchQuery] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [scrollPosition, setScrollPosition] = useState(0);
   const [stocks, setStocks] = useState<StockData[]>(stockTickers);
   const [selectedCompany, setSelectedCompany] = useState<string | null>(null);
   const [selectedTicker, setSelectedTicker] = useState<string | null>(null);
   const [isLoadingStocks, setIsLoadingStocks] = useState(true);
   const [lastUpdate, setLastUpdate] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setScrollPosition(prev => {
-        const newPosition = prev + 1;
-        if (newPosition >= stocks.length) {
-          return 0;
-        }
-        return newPosition;
-      });
-    }, 3000);
-
-    return () => clearInterval(interval);
-  }, [stocks.length]);
 
   const generateSampleStockData = (symbol: string) => {
     const basePrice = 100 + Math.random() * 900;
@@ -75,75 +114,53 @@ function App() {
     };
   };
 
-  const fetchStockData = async (symbol: string) => {
+  const fetchStockData = async (ticker: string) => {
     try {
-      const apiKey = "Z77KZQ17AVAUO1NW";
-      
-      // Intentar obtener datos del caché primero
-      const cachedData = localStorage.getItem(`stock_${symbol}`);
-      if (cachedData) {
-        const { data, timestamp } = JSON.parse(cachedData);
-        const now = new Date().getTime();
-        if (now - timestamp < 5 * 60 * 1000) { // 5 minutos de caché para datos de acciones
-          return {
-            symbol,
-            name: stockTickers.find(s => s.symbol === symbol)?.name || '',
-            price: parseFloat(data['05. price']),
-            change: parseFloat(data['10. change percent'].replace('%', '')),
-            loading: false
-          };
-        }
-      }
-
-      const response = await fetch(
-        `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${symbol}&apikey=${apiKey}`
-      );
-      
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
+      const response = await fetch(`https://www.alphavantage.co/query?function=TIME_SERIES_DAILY_ADJUSTED&symbol=${ticker}&apikey=demo`);
       const data = await response.json();
-
-      // Verificar si hay un mensaje de error de la API
-      if (data.Note) {
-        console.warn(`API Note for ${symbol}:`, data.Note);
-        throw new Error(data.Note);
-      }
-
-      if (!data['Global Quote'] || Object.keys(data['Global Quote']).length === 0) {
-        console.warn(`No Global Quote data for ${symbol}`);
-        return {
-          symbol,
-          name: stockTickers.find(s => s.symbol === symbol)?.name || '',
-          loading: false,
-          error: 'No data available'
-        };
-      }
-
-      const quote = data['Global Quote'];
       
-      // Guardar en caché
-      localStorage.setItem(`stock_${symbol}`, JSON.stringify({
-        data: quote,
-        timestamp: new Date().getTime()
-      }));
+      if (data['Error Message']) {
+        throw new Error(data['Error Message']);
+      }
+
+      const timeSeriesData = data['Time Series (Daily)'];
+      if (!timeSeriesData) {
+        throw new Error('No se encontraron datos para este ticker');
+      }
+
+      const dates = Object.keys(timeSeriesData);
+      const latestDate = dates[0];
+      const previousDate = dates[1];
+
+      const latestPrice = parseFloat(timeSeriesData[latestDate]['4. close']);
+      const previousPrice = parseFloat(timeSeriesData[previousDate]['4. close']);
+      const change = ((latestPrice - previousPrice) / previousPrice) * 100;
+
+      const stock = stockTickers.find(s => s.symbol === ticker);
+      if (!stock) {
+        throw new Error('Ticker no encontrado en la lista de acciones');
+      }
 
       return {
-        symbol,
-        name: stockTickers.find(s => s.symbol === symbol)?.name || '',
-        price: parseFloat(quote['05. price']),
-        change: parseFloat(quote['10. change percent'].replace('%', '')),
+        symbol: stock.symbol,
+        name: stock.name,
+        market: stock.market,
+        price: latestPrice,
+        change: change,
         loading: false
-      };
+      } as StockData;
     } catch (error) {
-      console.error(`Error fetching data for ${symbol}:`, error);
+      const stock = stockTickers.find(s => s.symbol === ticker);
+      if (!stock) {
+        throw new Error('Ticker no encontrado en la lista de acciones');
+      }
       return {
-        symbol,
-        name: stockTickers.find(s => s.symbol === symbol)?.name || '',
+        symbol: stock.symbol,
+        name: stock.name,
+        market: stock.market,
         loading: false,
-        error: 'Error fetching data'
-      };
+        error: error instanceof Error ? error.message : 'Error desconocido'
+      } as StockData;
     }
   };
 
@@ -158,7 +175,7 @@ function App() {
         
         // Update company overview data first
         console.log('Updating company overview data...');
-        const companyData = await updateCompanyData(tickers);
+        const companyData = await updateCompanyData(tickers.join(','));
         console.log('Company overview data updated');
         
         // Fetch stock data with delay between calls
@@ -182,10 +199,25 @@ function App() {
         }
         
         if (results.length === 0) {
-          setStocks([]);
           setError('Error fetching stock data. Please try again later.');
         } else {
-          setStocks(results);
+          // Actualizar solo los datos que han cambiado
+          setStocks(prevStocks => {
+            const updatedStocks = prevStocks.map(prevStock => {
+              const newData = results.find(r => r.symbol === prevStock.symbol);
+              if (newData) {
+                return {
+                  ...prevStock,
+                  price: newData.price,
+                  change: newData.change,
+                  loading: newData.loading,
+                  error: newData.error
+                };
+              }
+              return prevStock;
+            });
+            return updatedStocks;
+          });
           setError(null);
           console.log('Successfully loaded stock data for', results.length, 'stocks');
         }
@@ -227,7 +259,6 @@ function App() {
   const handleStockClick = async (symbol: string) => {
     if (isLoading) return;
     const analysisPrompt = `Dame un análisis de ${symbol}`;
-    // Esta función ahora se manejará en el componente AIAssistant
     setSelectedTicker(symbol);
     const stock = stocks.find(s => s.symbol === symbol);
     if (stock) {
@@ -239,9 +270,6 @@ function App() {
     setSelectedCompany(company);
     setSelectedTicker(ticker);
   };
-
-  // Duplicar los stocks para el carrusel infinito
-  const duplicatedStocks = [...stocks, ...stocks, ...stocks];
 
   return (
     <div className="min-h-screen bg-gray-100">
@@ -306,72 +334,11 @@ function App() {
           </div>
         </header>
 
-        <div className="glass-panel mt-4 mx-4 overflow-hidden">
-          <div className="py-3">
-            {isLoadingStocks ? (
-              <div className="flex justify-center items-center h-32">
-                <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-[#b9d6ee]"></div>
-              </div>
-            ) : (
-              <div 
-                className="flex gap-4 transition-transform duration-1000"
-                style={{ 
-                  transform: `translateX(-${scrollPosition * 200}px)`,
-                  width: 'fit-content'
-                }}
-              >
-                {error ? (
-                  <div className="error-message">
-                    <h3>API Key Required</h3>
-                    <p>{error}</p>
-                    <p>To get an API key:</p>
-                    <ol>
-                      <li>Visit <a href="https://www.alphavantage.co/support/#api-key" target="_blank" rel="noopener noreferrer">Alpha Vantage</a></li>
-                      <li>Sign up for a free API key</li>
-                      <li>Create a .env file in the root directory</li>
-                    </ol>
-                  </div>
-                ) : (
-                  duplicatedStocks.map((stock, index) => (
-                    <button
-                      key={`${stock.symbol}-${index}`}
-                      onClick={() => handleStockClick(stock.symbol)}
-                      className="glass-panel w-46 p-3 hover:bg-white/5 transition-colors flex-shrink-0 button-glow"
-                    >
-                      <div className="flex justify-between items-start">
-                        <div className="flex flex-col">
-                          <div className="text-lg font-bold text-[#b9d6ee]">{stock.symbol}</div>
-                          <div className="text-xs text-[#b9d6ee]/70 truncate max-w-20">{stock.name}</div>
-                        </div>
-                        
-                        {stock.loading ? (
-                          <div className="animate-pulse bg-[#b9d6ee]/20 h-4 w-16 rounded"></div>
-                        ) : (
-                          <div className="flex flex-col items-end">
-                            {stock.change !== undefined ? (
-                              <div className={`flex items-center text-xs ${stock.change >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                                {stock.change >= 0 ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}
-                                <span className="ml-1">{Math.abs(stock.change).toFixed(2)}%</span>
-                              </div>
-                            ) : (
-                              <div className="text-xs text-[#b9d6ee]/50">N/A</div>
-                            )}
-                            
-                            {stock.price !== undefined ? (
-                              <div className="text-sm font-medium text-[#b9d6ee]">${stock.price.toFixed(2)}</div>
-                            ) : (
-                              <div className="text-xs text-[#b9d6ee]/50">N/A</div>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    </button>
-                  ))
-                )}
-              </div>
-            )}
-          </div>
-        </div>
+        <StockTicker 
+          stocks={stocks}
+          onStockClick={handleStockClick}
+          error={error}
+        />
 
         {currentView === 'dashboard' ? (
           <div className="flex flex-1 gap-4 p-4 overflow-hidden">
@@ -379,34 +346,13 @@ function App() {
               onCompanySelected={handleCompanySelected} 
               stocks={stocks} 
             />
-
             <RightPanel selectedCompany={selectedCompany} selectedTicker={selectedTicker} />
           </div>
         ) : (
-          <div className="flex-1 p-4">
-            <div className="glass-panel p-6 max-w-4xl mx-auto">
-              <div className="mb-8">
-                <h2 className="text-2xl font-bold text-[#b9d6ee] mb-4">Market Reports</h2>
-                <div className="relative">
-                  <input
-                    type="text"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="Search by stock symbol, report type, or date..."
-                    className="w-full glass-panel px-4 py-3 pl-12 focus:outline-none focus:ring-2 focus:ring-[#b9d6ee] text-[#b9d6ee] placeholder-[#b9d6ee]/50"
-                  />
-                  <Search className="absolute left-4 top-3.5 w-5 h-5 text-[#b9d6ee]/50" />
-                </div>
-              </div>
-
-              <div className="space-y-4">
-                <div className="glass-panel p-8 text-center">
-                  <p className="text-[#b9d6ee]/70 mb-2">No reports found</p>
-                  <p className="text-sm text-[#b9d6ee]/50">Try adjusting your search criteria</p>
-                </div>
-              </div>
-            </div>
-          </div>
+          <MarketReports 
+            searchQuery={searchQuery}
+            onSearchChange={setSearchQuery}
+          />
         )}
       </div>
     </div>

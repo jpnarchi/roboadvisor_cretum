@@ -2,7 +2,7 @@ import { AIRecommendation } from '../types/AIRecommendation';
 
 const ALPHA_VANTAGE_API_KEY = "Z77KZQ17AVAUO1NW";
 
-export const getAIRecommendation = async (symbol: string) => {
+export const getAIRecommendation = async (symbol: string): Promise<AIRecommendation> => {
   try {
     // Obtener datos de la compañía
     const companyData = await fetch(
@@ -20,25 +20,23 @@ export const getAIRecommendation = async (symbol: string) => {
     ).then(res => res.json());
 
     // Simular análisis AI con los datos obtenidos
-    const analysis = {
-      recommendation: 'HOLD',
-      confidence: 0.75,
-      reasoning: [
+    const analysis: AIRecommendation = {
+      recommendation: 'HOLD' as const,
+      explanation: [
         `Sector: ${companyData.Sector || 'N/A'}`,
         `Industry: ${companyData.Industry || 'N/A'}`,
         `Market Cap: ${companyData.MarketCapitalization || 'N/A'}`,
         `P/E Ratio: ${companyData.PERatio || 'N/A'}`,
         `RSI: ${technicalData['Technical Analysis: RSI']?.[Object.keys(technicalData['Technical Analysis: RSI'] || {})[0]]?.RSI || 'N/A'}`
-      ]
+      ].join('\n')
     };
 
     return analysis;
   } catch (error) {
     console.error('Error getting AI recommendation:', error);
     return {
-      recommendation: 'N/A',
-      confidence: 0,
-      reasoning: ['Error al obtener datos para el análisis']
+      recommendation: 'HOLD' as const,
+      explanation: 'Error al obtener datos para el análisis'
     };
   }
 }; 

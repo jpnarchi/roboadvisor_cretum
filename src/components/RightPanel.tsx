@@ -5,6 +5,29 @@ import { getAIRecommendation } from '../services/aiService';
 import AIRecommendationPanel from './AIRecommendationPanel';
 import { AIRecommendation } from '../types/AIRecommendation';
 import html2pdf from 'html2pdf.js';
+import { Line } from 'react-chartjs-2';
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Title,
+  Tooltip,
+  Legend,
+  ChartData
+} from 'chart.js';
+
+// Registrar los componentes necesarios de Chart.js
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Title,
+  Tooltip,
+  Legend
+);
 
 // Añade esta nueva función al componente RightPanel
 const formatMarketCap = (value: string | undefined) => {
@@ -87,6 +110,7 @@ interface StockData {
   "Rated On": string;
   Price: string;
   overview?: CompanyOverview;
+  market?: string;
 }
 
 interface PortfolioTrendData {
@@ -105,6 +129,15 @@ interface PortfolioTrendData {
   "Trend Strength": number;
 }
 
+interface DailyPriceData {
+  date: string;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  volume: number;
+}
+
 const RightPanel: React.FC<RightPanelProps> = ({ selectedCompany, selectedTicker }) => {
   const [stockData, setStockData] = useState<StockData | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -113,21 +146,75 @@ const RightPanel: React.FC<RightPanelProps> = ({ selectedCompany, selectedTicker
   const [isLoadingAI, setIsLoadingAI] = useState(false);
   const [portfolioTrend, setPortfolioTrend] = useState<PortfolioTrendData | null>(null);
   const contentRef = useRef<HTMLDivElement>(null);
+  const [dailyPrices, setDailyPrices] = useState<DailyPriceData[]>([]);
+  const [isLoadingPrices, setIsLoadingPrices] = useState(false);
 
   const handleExport = async () => {
     if (!contentRef.current) return;
 
     const element = contentRef.current;
     const opt = {
-      margin: 1,
+      margin: 0.2,
       filename: `${selectedCompany || 'stock'}_report.pdf`,
       image: { type: 'jpeg', quality: 0.98 },
-      html2canvas: { scale: 2 },
-      jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
+      html2canvas: { 
+        scale: 2,
+        backgroundColor: '#1a1a1a',
+        logging: true,
+        useCORS: true
+      },
+      jsPDF: { 
+        unit: 'in', 
+        format: 'letter', 
+        orientation: 'portrait',
+        compress: true
+      }
     };
 
     try {
+      // Aplicar estilos temporales para el PDF
+      const originalStyles = element.getAttribute('style') || '';
+      element.setAttribute('style', `
+        ${originalStyles}
+        background-color: #1a1a1a !important;
+        color: #ffffff !important;
+      `);
+
+      // Aplicar estilos a todos los elementos dentro del contenedor
+      const allElements = element.getElementsByTagName('*');
+      for (let i = 0; i < allElements.length; i++) {
+        const el = allElements[i] as HTMLElement;
+        const currentStyle = el.getAttribute('style') || '';
+        
+        // Si es un h2, aplicar color blanco sólido
+        if (el.tagName.toLowerCase() === 'h2') {
+          el.setAttribute('style', `
+            ${currentStyle}
+            color: #ffffff !important;
+            background: none !important;
+            -webkit-background-clip: initial !important;
+            background-clip: initial !important;
+            text-fill-color: #ffffff !important;
+            -webkit-text-fill-color: #ffffff !important;
+          `);
+        } else {
+          el.setAttribute('style', `
+            ${currentStyle}
+            background-color: #1a1a1a !important;
+            color: #ffffff !important;
+            border-color: #333333 !important;
+          `);
+        }
+      }
+
       await html2pdf().set(opt).from(element).save();
+
+      // Restaurar estilos originales
+      element.setAttribute('style', originalStyles);
+      for (let i = 0; i < allElements.length; i++) {
+        const el = allElements[i] as HTMLElement;
+        el.removeAttribute('style');
+      }
     } catch (error) {
       console.error('Error exporting PDF:', error);
     }
@@ -177,6 +264,12 @@ const RightPanel: React.FC<RightPanelProps> = ({ selectedCompany, selectedTicker
         setIsLoading(true);
         setError(null);
         
+        // Determinar el mercado basado en el ticker
+        const market = selectedTicker.includes('.BMV') ? 'Mexico' :
+                      selectedTicker.includes('.DEX') ? 'XETRA' :
+                      selectedTicker.includes('.LON') ? 'LSE' :
+                      selectedTicker.includes('.MIL') ? 'Milan' : 'US';
+        
         // Actualizar datos de la compañía
         const updateSuccess = await updateCompanyData(selectedTicker);
         if (!updateSuccess) {
@@ -194,7 +287,8 @@ const RightPanel: React.FC<RightPanelProps> = ({ selectedCompany, selectedTicker
           Rating: "N/A",
           "Rated On": "Not rated",
           Price: companyData["50DayMovingAverage"] || "N/A",
-          overview: companyData
+          overview: companyData,
+          market: market
         };
         
         setStockData(stockData);
@@ -219,7 +313,7 @@ const RightPanel: React.FC<RightPanelProps> = ({ selectedCompany, selectedTicker
         const recommendation = await getAIRecommendation(selectedTicker);
         setAiRecommendation({
           recommendation: recommendation.recommendation,
-          explanation: recommendation.reasoning.join('\n')
+          explanation: recommendation.explanation
         });
       } catch (error) {
         console.error('Error getting AI recommendation:', error);
@@ -335,6 +429,99 @@ const RightPanel: React.FC<RightPanelProps> = ({ selectedCompany, selectedTicker
     return () => clearInterval(intervalId);
   }, [selectedTicker, selectedCompany]);
 
+  useEffect(() => {
+    const fetchDailyPrices = async () => {
+      if (!selectedTicker) return;
+      
+      setIsLoadingPrices(true);
+      try {
+        const apiKey = "Z77KZQ17AVAUO1NW";
+        const response = await fetch(
+          `https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=${selectedTicker}&apikey=${apiKey}`
+        );
+        
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        
+        if (data["Time Series (Daily)"]) {
+          const prices: DailyPriceData[] = Object.entries(data["Time Series (Daily)"])
+            .map(([date, values]: [string, any]) => ({
+              date,
+              open: parseFloat(values["1. open"]),
+              high: parseFloat(values["2. high"]),
+              low: parseFloat(values["3. low"]),
+              close: parseFloat(values["4. close"]),
+              volume: parseInt(values["5. volume"])
+            }))
+            .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+          
+          setDailyPrices(prices);
+        }
+      } catch (error) {
+        console.error('Error fetching daily prices:', error);
+      } finally {
+        setIsLoadingPrices(false);
+      }
+    };
+
+    fetchDailyPrices();
+  }, [selectedTicker]);
+
+  const chartData: ChartData<'line'> = {
+    labels: dailyPrices.map(price => price.date),
+    datasets: [
+      {
+        label: 'Close Price',
+        data: dailyPrices.map(price => price.close),
+        borderColor: '#b9d6ee',
+        backgroundColor: 'rgba(185, 214, 238, 0.1)',
+        borderWidth: 2,
+        fill: true,
+        tension: 0.4
+      }
+    ]
+  };
+
+  const chartOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: {
+        display: false
+      },
+      tooltip: {
+        mode: 'index' as const,
+        intersect: false,
+        backgroundColor: 'rgba(0, 0, 0, 0.8)',
+        titleColor: '#b9d6ee',
+        bodyColor: '#b9d6ee',
+        borderColor: '#b9d6ee',
+        borderWidth: 1
+      }
+    },
+    scales: {
+      x: {
+        grid: {
+          color: 'rgba(185, 214, 238, 0.1)'
+        },
+        ticks: {
+          color: '#b9d6ee'
+        }
+      },
+      y: {
+        grid: {
+          color: 'rgba(185, 214, 238, 0.1)'
+        },
+        ticks: {
+          color: '#b9d6ee'
+        }
+      }
+    }
+  };
+
   const getRatingBackground = (rating: string | undefined) => {
     if (!rating || rating === 'N/A') return 'from-gray-500/5 border-gray-500/30';
     const upperRating = rating.toUpperCase();
@@ -389,8 +576,17 @@ const RightPanel: React.FC<RightPanelProps> = ({ selectedCompany, selectedTicker
               <div className="flex items-center justify-between w-full">
                 <div className="flex items-center gap-3 mb-2">
                   <h2 className="text-4xl font-extrabold tracking-tight bg-gradient-to-r from-white to-[#b9d6ee] bg-clip-text text-transparent">{selectedCompany}</h2>
-                  {selectedTicker && (
-                    <span className="text-lg font-bold text-[#b9d6ee] bg-[#b9d6ee]/5 px-4 py-1.5 rounded-lg border border-[#b9d6ee]/20 shadow-glow">({selectedTicker})</span>
+                {selectedTicker && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-lg font-bold text-[#b9d6ee] bg-[#b9d6ee]/5 px-4 py-1.5 rounded-lg border border-[#b9d6ee]/20 shadow-glow">
+                        ({selectedTicker})
+                      </span>
+                      {stockData?.market && (
+                        <span className="text-sm font-medium text-[#b9d6ee]/70 bg-[#b9d6ee]/5 px-2 py-1 rounded border border-[#b9d6ee]/20">
+                          {stockData.market}
+                        </span>
+                      )}
+                    </div>
                   )}
                 </div>
                 <button
@@ -407,14 +603,14 @@ const RightPanel: React.FC<RightPanelProps> = ({ selectedCompany, selectedTicker
                 {stockData?.overview?.Sector || 'Sector not available'}
               </p>
             </div>
-          </div>
-
-          {isLoading ? (
-            <div className="flex items-center justify-center h-32">
-              <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-[#b9d6ee]"></div>
-            </div>
-          ) : stockData ? (
-            <>
+              </div>
+              
+              {isLoading ? (
+                <div className="flex items-center justify-center h-32">
+                  <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-[#b9d6ee]"></div>
+                </div>
+              ) : stockData && (
+                <>
               <div className="mt-4 grid grid-cols-4 gap-6 w-full">
                 <div className="glass-panel p-4 rounded-xl border border-[#b9d6ee]/10 bg-gradient-to-br from-[#b9d6ee]/5 to-transparent backdrop-blur-lg shadow-glow">
                   <span className="text-sm uppercase tracking-wider text-[#b9d6ee]/70 font-medium">Price</span>
@@ -540,24 +736,39 @@ const RightPanel: React.FC<RightPanelProps> = ({ selectedCompany, selectedTicker
                 <div className="col-span-1 lg:col-span-2">
                   <AIRecommendationPanel 
                     recommendation={aiRecommendation}
-                    isLoading={isLoadingAI}
+                    isLoading={false}
+                    companyOverview={stockData?.overview}
                   />
                 </div>
               </div>
             </>
-          ) : (
-            <div className="mt-4 text-[#b9d6ee]/70">
-              {error}
-            </div>
           )}
+          
+          {selectedTicker && (
+            <>
+              {/* <div className="mt-6 w-full">
+                <StockChart 
+                  ticker={selectedTicker} 
+                  companyName={selectedCompany || ''}
+                />
+              </div> */}
 
-          {selectedTicker && !isLoading && (
-            <div className="mt-6 w-full">
-              <StockChart 
-                ticker={selectedTicker} 
-                companyName={selectedCompany || ''}
-              />
-            </div>
+              <div className="mt-6 w-full glass-panel p-6 rounded-xl border border-[#b9d6ee]/10 bg-gradient-to-br from-[#b9d6ee]/5 to-transparent backdrop-blur-lg shadow-glow">
+                <h3 className="text-lg font-semibold mb-6 text-[#b9d6ee] flex items-center">
+                  <span className="mr-2">Daily Price Chart</span>
+                  <div className="h-px flex-1 bg-gradient-to-r from-[#b9d6ee]/20 to-transparent"></div>
+                </h3>
+                {isLoadingPrices ? (
+                  <div className="flex justify-center items-center h-64">
+                    <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-[#b9d6ee]"></div>
+                  </div>
+                ) : (
+                  <div className="h-64">
+                    <Line data={chartData} options={chartOptions} />
+                  </div>
+                )}
+              </div>
+            </>
           )}
         </div>
       ) : (
