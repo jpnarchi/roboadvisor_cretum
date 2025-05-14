@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search } from 'lucide-react';
+import { Search, Download } from 'lucide-react';
 import RightPanel from './components/RightPanel';
 import { updateData, getLastUpdateTime } from './services/dataService';
 import { toast } from 'react-toastify';
@@ -18,6 +18,64 @@ interface StockData {
   price?: number;
   loading?: boolean;
   error?: string;
+}
+
+interface StockOverview {
+  Symbol: string;
+  Name: string;
+  Description: string;
+  Sector: string;
+  Industry: string;
+  MarketCapitalization: string;
+  PERatio: string;
+  PEGRatio: string;
+  BookValue: string;
+  DividendPerShare: string;
+  DividendYield: string;
+  EPS: string;
+  RevenuePerShareTTM: string;
+  ProfitMargin: string;
+  OperatingMarginTTM: string;
+  ReturnOnAssetsTTM: string;
+  ReturnOnEquityTTM: string;
+  RevenueTTM: string;
+  GrossProfitTTM: string;
+  DilutedEPSTTM: string;
+  QuarterlyEarningsGrowthYOY: string;
+  QuarterlyRevenueGrowthYOY: string;
+  AnalystTargetPrice: string;
+  TrailingPE: string;
+  ForwardPE: string;
+  PriceToSalesRatioTTM: string;
+  PriceToBookRatio: string;
+  EVToRevenue: string;
+  EVToEBITDA: string;
+  Beta: string;
+  "52WeekHigh": string;
+  "52WeekLow": string;
+  "50DayMovingAverage": string;
+  "200DayMovingAverage": string;
+  SharesOutstanding: string;
+  DividendDate: string;
+  ExDividendDate: string;
+  AnalystRatingBuy: string;
+  AnalystRatingHold: string;
+  AnalystRatingSell: string;
+}
+
+// Interfaz para la respuesta de la API EODHD
+interface EODHDResponse {
+  code: string;
+  timestamp: number;
+  gmtoffset: number;
+  open: number | any;
+  high: number | any;
+  low: number | any;
+  close: number | any;
+  volume: number | any;
+  previousClose: number | any;
+  change: number | any;
+  change_p: number | any;
 }
 
 const stockTickers: StockData[] = [
@@ -50,12 +108,12 @@ const stockTickers: StockData[] = [
   { symbol: 'EWZ', name: 'iShares MSCI Brazil ETF', market: 'US' },
   
   // German Stocks (XETRA)
-  { symbol: 'MBG.DEX', name: 'Mercedes-Benz Group AG', market: 'XETRA' },
-  { symbol: 'DHER.DEX', name: 'Deutsche Börse AG', market: 'XETRA' },
-  { symbol: 'SMSN.DEX', name: 'Siemens AG', market: 'XETRA' },
-  { symbol: 'POAHY.DEX', name: 'Porsche Automobil Holding SE', market: 'XETRA' },
-  { symbol: 'BMW.DEX', name: 'BMW AG', market: 'XETRA' },
-  { symbol: 'SAP.DEX', name: 'SAP SE', market: 'XETRA' },
+  { symbol: 'MBG.XETRA', name: 'Mercedes-Benz Group AG', market: 'XETRA' },
+  { symbol: 'DHER.XETRA', name: 'Deutsche Börse AG', market: 'XETRA' },
+  { symbol: 'SMSN.IL', name: 'Siemens AG', market: 'XETRA' },
+  { symbol: 'POAHY.US', name: 'Porsche Automobil Holding SE', market: 'XETRA' },
+  { symbol: 'BMW.XETRA', name: 'BMW AG', market: 'XETRA' },
+  { symbol: 'SAP.XETRA', name: 'SAP SE', market: 'XETRA' },
   
   // UK Stocks (London Stock Exchange)
   { symbol: 'TSCO.LON', name: 'Tesco PLC', market: 'LSE' },
@@ -90,17 +148,50 @@ const stockTickers: StockData[] = [
   { symbol: '000333.SHZ', name: 'Midea Group Co., Ltd.', market: 'SZSE' }
 ];
 
-
 function App() {
   const [currentView, setCurrentView] = useState<'dashboard' | 'reports'>('dashboard');
   const [searchQuery, setSearchQuery] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [stocks, setStocks] = useState<StockData[]>(stockTickers);
+  // Inicializar stocks como un array vacío y luego llenarlo después
+  const [stocks, setStocks] = useState<StockData[]>([]);
   const [selectedCompany, setSelectedCompany] = useState<string | null>(null);
   const [selectedTicker, setSelectedTicker] = useState<string | null>(null);
   const [isLoadingStocks, setIsLoadingStocks] = useState(true);
   const [lastUpdate, setLastUpdate] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
+  const [isExporting, setIsExporting] = useState(false);
+  const [exportProgress, setExportProgress] = useState(0);
+
+  // EODHD API Key
+  const EODHD_API_KEY = "6824b2d80fe347.44604306";
+
+  // Función para convertir el símbolo al formato de EODHD
+  const formatSymbolForEODHD = (symbol: string, market: string): string => {
+    // Stock US mantiene el símbolo y agrega .US
+    if (market === 'US') {
+      return `${symbol}.US`;
+    }
+    
+    // Para los demás mercados, mapear según el formato requerido por EODHD
+    switch (market) {
+      case 'XETRA':
+        return symbol.replace('.DEX', '.DE');
+      case 'LSE':
+        return symbol.replace('.LON', '.L');
+      case 'TSX':
+        return symbol.replace('.TRT', '.TO');
+      case 'TSXV':
+        return symbol.replace('.TRV', '.V');
+      case 'BSE':
+        return symbol.replace('.BSE', '.BO');
+      case 'SSE':
+        return symbol.replace('.SHH', '.SS');
+      case 'SZSE':
+        return symbol.replace('.SHZ', '.SZ');
+      default:
+        return `${symbol}.US`;
+    }
+  };
 
   const generateSampleStockData = (symbol: string) => {
     const basePrice = 100 + Math.random() * 900;
@@ -114,39 +205,34 @@ function App() {
     };
   };
 
-  const fetchStockData = async (ticker: string) => {
+  const fetchStockData = async (ticker: string): Promise<StockData> => {
     try {
-      const response = await fetch(`https://www.alphavantage.co/query?function=TIME_SERIES_DAILY_ADJUSTED&symbol=${ticker}&apikey=demo`);
-      const data = await response.json();
-      
-      if (data['Error Message']) {
-        throw new Error(data['Error Message']);
-      }
-
-      const timeSeriesData = data['Time Series (Daily)'];
-      if (!timeSeriesData) {
-        throw new Error('No se encontraron datos para este ticker');
-      }
-
-      const dates = Object.keys(timeSeriesData);
-      const latestDate = dates[0];
-      const previousDate = dates[1];
-
-      const latestPrice = parseFloat(timeSeriesData[latestDate]['4. close']);
-      const previousPrice = parseFloat(timeSeriesData[previousDate]['4. close']);
-      const change = ((latestPrice - previousPrice) / previousPrice) * 100;
-
       const stock = stockTickers.find(s => s.symbol === ticker);
       if (!stock) {
         throw new Error('Ticker no encontrado en la lista de acciones');
       }
+      
+      // Formatear el símbolo para EODHD
+      const formattedSymbol = formatSymbolForEODHD(stock.symbol, stock.market);
+      
+      // Realizar la solicitud a la API de EODHD
+      const response = await fetch(`https://eodhd.com/api/real-time/${formattedSymbol}?api_token=${EODHD_API_KEY}&fmt=json`);
+      const data: EODHDResponse = await response.json();
+      
+      if (!data || !data.code) {
+        throw new Error('No se encontraron datos para este ticker');
+      }
+
+      // Nos aseguramos de que price y change sean números válidos
+      const price = typeof data.close === 'number' && !isNaN(data.close) ? data.close : undefined;
+      const change = typeof data.change_p === 'number' && !isNaN(data.change_p) ? data.change_p : undefined;
 
       return {
         symbol: stock.symbol,
         name: stock.name,
         market: stock.market,
-        price: latestPrice,
-        change: change,
+        price,  // Nos aseguramos de que sea un número o undefined
+        change, // Nos aseguramos de que sea un número o undefined
         loading: false
       } as StockData;
     } catch (error) {
@@ -170,6 +256,14 @@ function App() {
       setError(null);
       
       try {
+        // Inicializar stocks con la estructura básica de stockTickers antes de cargar datos
+        setStocks(stockTickers.map(ticker => ({ 
+          ...ticker, 
+          loading: true, 
+          price: undefined, 
+          change: undefined
+        })));
+        
         const tickers = stockTickers.map(s => s.symbol);
         console.log('Starting to load data for tickers:', tickers);
         
@@ -181,8 +275,8 @@ function App() {
         // Fetch stock data with delay between calls
         console.log('Fetching stock prices...');
         
-        // Procesar en lotes de 3 para evitar límites de API
-        const batchSize = 3;
+        // Procesar en lotes de 5 para evitar límites de API
+        const batchSize = 5;
         const results: StockData[] = [];
         
         for (let i = 0; i < tickers.length; i += batchSize) {
@@ -192,9 +286,9 @@ function App() {
           const batchResults = await Promise.all(batchPromises);
           results.push(...batchResults.filter(result => result && !result.error));
           
-          // Esperar 12 segundos entre lotes para evitar límites de API
+          // Esperar 1 segundo entre lotes para evitar límites de API
           if (i + batchSize < tickers.length) {
-            await new Promise(resolve => setTimeout(resolve, 12000));
+            await new Promise(resolve => setTimeout(resolve, 1000));
           }
         }
         
@@ -271,6 +365,91 @@ function App() {
     setSelectedTicker(ticker);
   };
 
+  const exportStockData = async () => {
+    setIsExporting(true);
+    setExportProgress(0);
+    
+    try {
+      const results: any[] = [];
+      const totalStocks = stockTickers.length;
+      
+      for (let i = 0; i < stockTickers.length; i++) {
+        const stock = stockTickers[i];
+        try {
+          const formattedSymbol = formatSymbolForEODHD(stock.symbol, stock.market);
+          const response = await fetch(
+            `https://eodhd.com/api/real-time/${formattedSymbol}?api_token=${EODHD_API_KEY}&fmt=json`
+          );
+          const data = await response.json();
+          
+          if (data.code) {
+            // Agregar información adicional
+            results.push({
+              Symbol: stock.symbol,
+              Name: stock.name,
+              Market: stock.market,
+              Price: data.close,
+              Change: data.change,
+              ChangePercent: data.change_p,
+              Open: data.open,
+              High: data.high,
+              Low: data.low,
+              Volume: data.volume,
+              PreviousClose: data.previousClose,
+              Timestamp: new Date(data.timestamp * 1000).toISOString()
+            });
+          }
+        } catch (error) {
+          console.error(`Error fetching data for ${stock.symbol}:`, error);
+        }
+        
+        // Actualizar progreso
+        setExportProgress(((i + 1) / totalStocks) * 100);
+        
+        // Esperar 1 segundo entre llamadas para evitar límites de API
+        if (i < stockTickers.length - 1) {
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+      }
+
+      // Convertir a CSV
+      if (results.length > 0) {
+        const headers = Object.keys(results[0]);
+        const csvContent = [
+          headers.join(','),
+          ...results.map(row => 
+            headers.map(header => {
+              const value = row[header];
+              return typeof value === 'string' && value.includes(',') 
+                ? `"${value}"` 
+                : value;
+            }).join(',')
+          )
+        ].join('\n');
+
+        // Crear y descargar archivo
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        const url = URL.createObjectURL(blob);
+        link.setAttribute('href', url);
+        link.setAttribute('download', `stock_data_${new Date().toISOString().split('T')[0]}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        toast.success('Data exported successfully!');
+      } else {
+        toast.error('No data to export. Please try again later.');
+      }
+    } catch (error) {
+      console.error('Error exporting data:', error);
+      toast.error('Failed to export data. Please try again later.');
+    } finally {
+      setIsExporting(false);
+      setExportProgress(0);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-100">
       <ToastContainer position="top-right" autoClose={3000} />
@@ -309,6 +488,14 @@ function App() {
                     d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
                   />
                 </svg>
+              </button>
+              <button
+                onClick={exportStockData}
+                disabled={isExporting}
+                className="px-4 py-2 bg-[#b9d6ee]/10 hover:bg-[#b9d6ee]/20 text-[#b9d6ee] rounded-lg border border-[#b9d6ee]/20 transition-all duration-200 flex items-center gap-2 shadow-glow disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Download className="w-5 h-5" />
+                {isExporting ? `Exporting (${Math.round(exportProgress)}%)` : 'Export Data'}
               </button>
               <button 
                 onClick={() => setCurrentView('dashboard')}

@@ -208,15 +208,18 @@ const MarketReports: React.FC<MarketReportsProps> = ({ searchQuery, onSearchChan
       </div>
 
       {selectedReport && (
-        <div className="w-1/2 glass-panel p-6">
+        <div className="w-1/2 glass-panel p-6 flex flex-col">
           <div className="mb-4">
             <h3 className="text-xl font-bold text-[#b9d6ee]">{selectedReport.stock_symbol}</h3>
             <p className="text-sm text-[#b9d6ee]/70">{selectedReport.title}</p>
           </div>
-          <StockChart 
-            ticker={selectedReport.stock_symbol} 
-            companyName={selectedReport.title}
-          />
+          <div className="flex-1 overflow-hidden">
+            <iframe
+              src={`${selectedReport.file_url}#toolbar=0`}
+              className="w-full h-full rounded-lg"
+              title={selectedReport.title}
+            />
+          </div>
         </div>
       )}
     </div>

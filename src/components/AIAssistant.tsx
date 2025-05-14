@@ -1,11 +1,7 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Send, Upload, FileText, X } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Send } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import * as pdfjs from 'pdfjs-dist';
-
-// Configurar el worker de PDF.js
-pdfjs.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
 
 const N8N_WEBHOOK_URL = 'https://cretum.app.n8n.cloud/webhook/cretum';
 
@@ -22,11 +18,6 @@ interface Message {
   role: 'user' | 'assistant';
   content: string;
   isStreaming?: boolean;
-  attachments?: Array<{
-    name: string;
-    type: string;
-    content: string;
-  }>;
 }
 
 interface AIAssistantProps {
@@ -42,9 +33,6 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ onCompanySelected, stocks }) 
   const [isLoading, setIsLoading] = useState(false);
   const [sessionId] = useState(() => generateSessionId());
   const [processedPatterns] = useState(new Set<string>());
-  const [attachments, setAttachments] = useState<Array<{ name: string; type: string; content: string }>>([]);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const [isProcessingPDF, setIsProcessingPDF] = useState(false);
 
   // Función para procesar el mensaje y detectar el patrón
   const processMessage = (content: string) => {
@@ -63,133 +51,27 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ onCompanySelected, stocks }) 
     }
   };
 
-  // Función para extraer texto de un PDF
-  const extractTextFromPDF = async (file: File): Promise<string> => {
-    try {
-      setIsProcessingPDF(true);
-      const arrayBuffer = await file.arrayBuffer();
-      
-      // Configurar opciones de carga del PDF
-      const loadingTask = pdfjs.getDocument({
-        data: arrayBuffer,
-        cMapUrl: `https://unpkg.com/pdfjs-dist@${pdfjs.version}/cmaps/`,
-        cMapPacked: true,
-      });
-
-      const pdf = await loadingTask.promise;
-      let fullText = '';
-
-      for (let i = 1; i <= pdf.numPages; i++) {
-        try {
-          const page = await pdf.getPage(i);
-          const textContent = await page.getTextContent();
-          const pageText = textContent.items
-            .map((item: any) => item.str)
-            .join(' ');
-          fullText += `[Página ${i}]\n${pageText}\n\n`;
-        } catch (pageError) {
-          console.error(`Error al procesar la página ${i}:`, pageError);
-          fullText += `[Página ${i} - Error al procesar]\n\n`;
-        }
-      }
-
-      return fullText;
-    } catch (error: any) {
-      console.error('Error al extraer texto del PDF:', error);
-      throw new Error(`No se pudo procesar el archivo PDF: ${error?.message || 'Error desconocido'}`);
-    } finally {
-      setIsProcessingPDF(false);
-    }
-  };
-
-  // Función para manejar la carga de archivos
-  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const files = event.target.files;
-    if (!files) return;
-
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i];
-      if (file.type === 'application/pdf') {
-        try {
-          setChatMessages(prev => [...prev, {
-            role: 'assistant',
-            content: `⏳ Procesando el archivo "${file.name}"...`
-          }]);
-
-          const text = await extractTextFromPDF(file);
-          
-          if (!text.trim()) {
-            throw new Error('El archivo PDF está vacío o no contiene texto extraíble');
-          }
-
-          setAttachments(prev => [...prev, {
-            name: file.name,
-            type: file.type,
-            content: text
-          }]);
-          
-          setChatMessages(prev => [...prev, {
-            role: 'assistant',
-            content: `✅ Archivo "${file.name}" cargado correctamente. Puedes preguntar sobre su contenido.`
-          }]);
-        } catch (error: any) {
-          console.error('Error al procesar el archivo:', error);
-          setChatMessages(prev => [...prev, {
-            role: 'assistant',
-            content: `❌ Error al procesar el archivo "${file.name}": ${error?.message || 'Error desconocido'}`
-          }]);
-        }
-      } else {
-        setChatMessages(prev => [...prev, {
-          role: 'assistant',
-          content: `❌ El archivo "${file.name}" no es un PDF válido. Por favor, sube solo archivos PDF.`
-        }]);
-      }
-    }
-  };
-
-  // Función para eliminar un archivo adjunto
-  const removeAttachment = (index: number) => {
-    setAttachments(prev => prev.filter((_, i) => i !== index));
-  };
-
-  const handleSendMessage = async (e: React.FormEvent, overrideMessage?: string) => {
+  const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
-    const messageToSend = overrideMessage || message;
-    if ((!messageToSend.trim() && attachments.length === 0) || isLoading) return;
+    if (!message.trim() || isLoading) return;
     
-    // Crear un mensaje que incluya información sobre los archivos adjuntos
-    let fullMessage = messageToSend;
-    if (attachments.length > 0) {
-      fullMessage += '\n\nHe adjuntado los siguientes documentos para que los analices:\n';
-      attachments.forEach(attachment => {
-        fullMessage += `\n--- Documento: ${attachment.name} ---\n${attachment.content}\n`;
-      });
-      fullMessage += '\nPor favor, analiza el contenido de estos documentos y responde a mi pregunta considerando esta información.';
-    }
-    
-    // Guardar el mensaje del usuario con los archivos adjuntos
     const userMessage = { 
       role: 'user' as const, 
-      content: messageToSend,
-      attachments: attachments.length > 0 ? [...attachments] : undefined
+      content: message
     };
     setChatMessages(prev => [...prev, userMessage]);
     setMessage('');
-    setAttachments([]);
     setIsLoading(true);
 
     try {
       console.log('Enviando mensaje al webhook:', {
-        prompt: fullMessage,
-        sessionId,
-        attachments: attachments.length > 0 ? attachments : undefined
+        prompt: message,
+        sessionId
       });
 
       const queryParams = new URLSearchParams({
-        prompt: fullMessage,
-        sessionId: sessionId,
-        attachments: attachments.length > 0 ? JSON.stringify(attachments) : ''
+        prompt: message,
+        sessionId: sessionId
       });
 
       const response = await fetch(`${N8N_WEBHOOK_URL}?${queryParams}`, {
@@ -314,19 +196,6 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ onCompanySelected, stocks }) 
                   : 'bg-white bg-opacity-10 text-gray-200'
               }`}
             >
-              {message.attachments && message.attachments.length > 0 && (
-                <div className="mb-3 p-2 bg-[#b9d6ee]/5 rounded-lg border border-[#b9d6ee]/10">
-                  <div className="text-sm font-medium text-[#b9d6ee] mb-2">Documentos adjuntos:</div>
-                  <div className="flex flex-wrap gap-2">
-                    {message.attachments.map((attachment, i) => (
-                      <div key={i} className="flex items-center gap-2 bg-[#b9d6ee]/10 px-3 py-1.5 rounded-lg">
-                        <FileText className="w-4 h-4 text-[#b9d6ee]" />
-                        <span className="text-sm text-[#b9d6ee]">{attachment.name}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
               <div className="markdown-content prose prose-invert max-w-none">
                 <ReactMarkdown 
                   remarkPlugins={[remarkGfm]}
@@ -411,27 +280,6 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ onCompanySelected, stocks }) 
         )}
       </div>
 
-      {attachments.length > 0 && (
-        <div className="px-4 py-2 border-t border-[#b9d6ee]/10">
-          <div className="flex flex-wrap gap-2">
-            {attachments.map((attachment, index) => (
-              <div key={index} className="flex items-center gap-2 bg-[#b9d6ee]/10 px-3 py-1.5 rounded-lg">
-                <FileText className="w-4 h-4 text-[#b9d6ee]" />
-                <span className="text-sm text-[#b9d6ee]">{attachment.name}</span>
-                <button
-                  onClick={() => removeAttachment(index)}
-                  className="text-[#b9d6ee]/70 hover:text-[#b9d6ee]"
-                  title="Remove attachment"
-                  aria-label="Remove attachment"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
       <form onSubmit={handleSendMessage} className="p-4 border-t border-[#b9d6ee]/10">
         <div className="flex gap-2">
           <input
@@ -440,37 +288,12 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ onCompanySelected, stocks }) 
             onChange={(e) => setMessage(e.target.value)}
             className="flex-1 glass-panel px-4 py-2 focus:outline-none focus:ring-2 focus:ring-[#b9d6ee] text-[#b9d6ee] placeholder-[#b9d6ee]/50"
             placeholder="Ask anything about your investments..."
-            disabled={isLoading || isProcessingPDF}
+            disabled={isLoading}
           />
-          <input
-            type="file"
-            ref={fileInputRef}
-            onChange={handleFileUpload}
-            accept=".pdf"
-            className="hidden"
-            multiple
-            title="Upload PDF files"
-            aria-label="Upload PDF files"
-            disabled={isProcessingPDF}
-          />
-          <button
-            type="button"
-            onClick={() => fileInputRef.current?.click()}
-            className="p-2 bg-[#b9d6ee] bg-opacity-20 rounded-lg hover:bg-opacity-30 disabled:opacity-50 disabled:cursor-not-allowed button-glow"
-            disabled={isLoading || isProcessingPDF}
-            title="Upload PDF"
-            aria-label="Upload PDF"
-          >
-            {isProcessingPDF ? (
-              <div className="w-5 h-5 border-2 border-[#b9d6ee] border-t-transparent rounded-full animate-spin" />
-            ) : (
-              <Upload className="w-5 h-5 text-[#b9d6ee]" />
-            )}
-          </button>
           <button 
             type="submit" 
             className="p-2 bg-[#b9d6ee] bg-opacity-20 rounded-lg hover:bg-opacity-30 disabled:opacity-50 disabled:cursor-not-allowed button-glow"
-            disabled={isLoading || isProcessingPDF}
+            disabled={isLoading}
             title="Send message"
             aria-label="Send message"
           >
