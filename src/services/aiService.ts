@@ -2,10 +2,13 @@ import { AIRecommendation, AIResponse } from '../types/AIRecommendation';
 import { getCompanyData } from './companyService';
 import OpenAI from 'openai';
 
-const openai = new OpenAI({
-  apiKey: import.meta.env.VITE_OPEN_AI_API_KEY,
-  dangerouslyAllowBrowser: true
-});
+// Initialize OpenAI client only if API key is available
+const openai = import.meta.env.VITE_OPEN_AI_API_KEY 
+  ? new OpenAI({
+      apiKey: import.meta.env.VITE_OPEN_AI_API_KEY,
+      dangerouslyAllowBrowser: true
+    })
+  : null;
 
 const SYSTEM_PROMPT = `A) Analiza cada acción del portafolio adjunto y clasifícala como "Comprar", "Vender" o "Mantener" siguiendo estos pasos:
 
@@ -112,6 +115,14 @@ export const getAIRecommendation = async (ticker: string): Promise<AIResponse> =
       return {
         recommendation: 'NEUTRAL',
         explanation: `Unable to analyze ${ticker} due to insufficient data.`
+      };
+    }
+
+    // Check if OpenAI client is available
+    if (!openai) {
+      return {
+        recommendation: 'NEUTRAL',
+        explanation: 'AI analysis is currently unavailable. Please try again later.'
       };
     }
 
