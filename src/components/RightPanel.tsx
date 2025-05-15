@@ -152,14 +152,7 @@ interface PortfolioTrendData {
   "Trend Strength": number;
 }
 
-interface DailyPriceData {
-  date: string;
-  open: number;
-  high: number;
-  low: number;
-  close: number;
-  volume: number;
-}
+
 
 const RightPanel: React.FC<RightPanelProps> = ({ selectedCompany, selectedTicker }) => {
   const [stockData, setStockData] = useState<StockData | null>(null);
