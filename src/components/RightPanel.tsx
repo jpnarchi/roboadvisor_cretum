@@ -30,10 +30,10 @@ ChartJS.register(
 );
 
 // Añade esta nueva función al componente RightPanel
-const formatMarketCap = (value: string | undefined) => {
-  if (!value || value === 'None' || value === '') return 'N/A';
+const formatMarketCap = (value: string | number | undefined) => {
+  if (value === undefined || value === null || value === 'None' || value === '') return 'N/A';
   
-  const num = parseFloat(value);
+  const num = typeof value === 'string' ? parseFloat(value) : value;
   if (isNaN(num)) return 'N/A';
   
   // Convertir a billones (trillions en inglés)
@@ -59,6 +59,28 @@ interface RightPanelProps {
   selectedTicker?: string | null;
 }
 
+// Updated interface for EODHD API response
+interface EODHDCompanyOverview {
+  "General::Code": string;
+  "General::Sector": string;
+  "Highlights::MarketCapitalization": number;
+  "Valuation::TrailingPE": number;
+  "Valuation::PriceBookMRQ": number;
+  "SplitsDividends::ForwardAnnualDividendYield": number;
+  "Technicals::Beta": number;
+  "Highlights::ReturnOnAssetsTTM": number;
+  "Highlights::ReturnOnEquityTTM": number;
+  "AnalystRatings::TargetPrice": number;
+  "SplitsDividends::ExDividendDate": string;
+  "AnalystRatings::Rating": number;
+  "AnalystRatings::StrongBuy": number;
+  "AnalystRatings::Buy": number;
+  "AnalystRatings::Hold": number;
+  "AnalystRatings::Sell": number;
+  "AnalystRatings::StrongSell": number;
+}
+
+// Legacy interface to maintain compatibility
 interface CompanyOverview {
   Symbol: string;
   Name: string;
@@ -104,12 +126,13 @@ interface CompanyOverview {
 
 interface StockData {
   Ticker: string;
-  "Market Capitalization": string;
+  "Market Capitalization": string | number;
   Sector: string;
-  Rating: string;
+  Rating: string | number;
   "Rated On": string;
-  Price: string;
+  Price: string | number;
   overview?: CompanyOverview;
+  eodhd?: EODHDCompanyOverview;
   market?: string;
 }
 
@@ -220,14 +243,42 @@ const RightPanel: React.FC<RightPanelProps> = ({ selectedCompany, selectedTicker
     }
   };
 
-  // Función para obtener datos directamente de la API de Alpha Vantage
-  const fetchCompanyDataFromAPI = async (symbol: string): Promise<CompanyOverview | null> => {
+  // Updated function to fetch company data from EODHD API
+  const fetchCompanyDataFromEODHD = async (symbol: string): Promise<EODHDCompanyOverview | null> => {
     try {
-      const apiKey = "Z77KZQ17AVAUO1NW";
-      console.log(`Fetching company data from Alpha Vantage API for ${symbol}...`);
+      // Clean up the ticker symbol by removing market extensions if needed
+      const cleanSymbol = symbol.includes('.') 
+        ? `${symbol.split('.')[0]}.${symbol.split('.')[1] === 'BMV' ? 'MX' : 
+           symbol.split('.')[1] === 'DEX' ? 'DE' : 
+           symbol.split('.')[1] === 'LON' ? 'GB' : 
+           symbol.split('.')[1] === 'MIL' ? 'IT' : 'US'}`
+        : `${symbol}.US`;
+
+      console.log(`Fetching company data from EODHD API for ${cleanSymbol}...`);
+      
+      const apiToken = "6824b2d80fe347.44604306"; // Your EODHD API token
+      const filters = [
+        "General::Code",
+        "General::Sector",
+        "Highlights::MarketCapitalization",
+        "Valuation::TrailingPE",
+        "Valuation::PriceBookMRQ",
+        "SplitsDividends::ForwardAnnualDividendYield",
+        "Technicals::Beta",
+        "Highlights::ReturnOnAssetsTTM",
+        "Highlights::ReturnOnEquityTTM",
+        "AnalystRatings::TargetPrice",
+        "SplitsDividends::ExDividendDate",
+        "AnalystRatings::Rating",
+        "AnalystRatings::StrongBuy",
+        "AnalystRatings::Buy",
+        "AnalystRatings::Hold",
+        "AnalystRatings::Sell",
+        "AnalystRatings::StrongSell"
+      ].join(",");
       
       const response = await fetch(
-        `https://www.alphavantage.co/query?function=OVERVIEW&symbol=${symbol}&apikey=${apiKey}`
+        `https://eodhd.com/api/fundamentals/${cleanSymbol}?filter=${filters}&api_token=${apiToken}&fmt=json`
       );
       
       if (!response.ok) {
@@ -235,23 +286,17 @@ const RightPanel: React.FC<RightPanelProps> = ({ selectedCompany, selectedTicker
       }
       
       const data = await response.json();
-      console.log(`API response for ${symbol}:`, data);
+      console.log(`EODHD API response for ${cleanSymbol}:`, data);
       
-      // Verificar si la respuesta es un error de la API
-      if (data.Note) {
-        console.error(`API Error for ${symbol}:`, data.Note);
+      // Check if the response has the expected data
+      if (!data["General::Code"]) {
+        console.error(`No valid data for ${cleanSymbol}`);
         return null;
       }
       
-      // Verificar si tenemos datos válidos
-      if (!data.Symbol) {
-        console.error(`No valid data for ${symbol}`);
-        return null;
-      }
-      
-      return data as CompanyOverview;
+      return data as EODHDCompanyOverview;
     } catch (error) {
-      console.error(`Error fetching company data from API for ${symbol}:`, error);
+      console.error(`Error fetching company data from EODHD API for ${symbol}:`, error);
       return null;
     }
   };
@@ -264,34 +309,54 @@ const RightPanel: React.FC<RightPanelProps> = ({ selectedCompany, selectedTicker
         setIsLoading(true);
         setError(null);
         
-        // Determinar el mercado basado en el ticker
+        // Determine market based on ticker
         const market = selectedTicker.includes('.BMV') ? 'Mexico' :
                       selectedTicker.includes('.DEX') ? 'XETRA' :
                       selectedTicker.includes('.LON') ? 'LSE' :
                       selectedTicker.includes('.MIL') ? 'Milan' : 'US';
         
-        // Actualizar datos de la compañía
-        const updateSuccess = await updateCompanyData(selectedTicker);
-        if (!updateSuccess) {
-          throw new Error('Failed to update company data');
+        // Fetch data from EODHD API
+        const eodhdData = await fetchCompanyDataFromEODHD(selectedTicker);
+        
+        if (eodhdData) {
+          // Create the stockData object with EODHD data
+          const stockData: StockData = {
+            Ticker: selectedTicker,
+            "Market Capitalization": eodhdData["Highlights::MarketCapitalization"],
+            Sector: eodhdData["General::Sector"] || "N/A",
+            Rating: eodhdData["AnalystRatings::Rating"] || "N/A",
+            "Rated On": "Not rated",
+            Price: 0, // Will be updated with daily price data
+            eodhd: eodhdData,
+            market: market
+          };
+          
+          setStockData(stockData);
+        } else {
+          // Fallback to the old method if EODHD fails
+          // Update company data
+          const updateSuccess = await updateCompanyData(selectedTicker);
+          if (!updateSuccess) {
+            throw new Error('Failed to update company data');
+          }
+          
+          // Get company data
+          const companyData = await getCompanyData(selectedTicker);
+          
+          // Create the stockData object with the company data
+          const stockData: StockData = {
+            Ticker: selectedTicker,
+            "Market Capitalization": companyData.MarketCapitalization || "N/A",
+            Sector: companyData.Sector || "N/A",
+            Rating: "N/A",
+            "Rated On": "Not rated",
+            Price: companyData["50DayMovingAverage"] || "N/A",
+            overview: companyData,
+            market: market
+          };
+          
+          setStockData(stockData);
         }
-        
-        // Obtener datos de la compañía
-        const companyData = await getCompanyData(selectedTicker);
-        
-        // Crear el objeto stockData con los datos de la compañía
-        const stockData: StockData = {
-          Ticker: selectedTicker,
-          "Market Capitalization": companyData.MarketCapitalization || "N/A",
-          Sector: companyData.Sector || "N/A",
-          Rating: "N/A",
-          "Rated On": "Not rated",
-          Price: companyData["50DayMovingAverage"] || "N/A",
-          overview: companyData,
-          market: market
-        };
-        
-        setStockData(stockData);
       } catch (error) {
         console.error('Error fetching data:', error);
         setError('Error fetching data. Please try again later.');
@@ -429,15 +494,24 @@ const RightPanel: React.FC<RightPanelProps> = ({ selectedCompany, selectedTicker
     return () => clearInterval(intervalId);
   }, [selectedTicker, selectedCompany]);
 
+  // Updated to use EODHD for daily prices as well
   useEffect(() => {
     const fetchDailyPrices = async () => {
       if (!selectedTicker) return;
       
       setIsLoadingPrices(true);
       try {
-        const apiKey = "Z77KZQ17AVAUO1NW";
+        // Clean up the ticker symbol by removing market extensions if needed
+        const cleanSymbol = selectedTicker.includes('.') 
+          ? `${selectedTicker.split('.')[0]}.${selectedTicker.split('.')[1] === 'BMV' ? 'MX' : 
+             selectedTicker.split('.')[1] === 'DEX' ? 'DE' : 
+             selectedTicker.split('.')[1] === 'LON' ? 'GB' : 
+             selectedTicker.split('.')[1] === 'MIL' ? 'IT' : 'US'}`
+          : `${selectedTicker}.US`;
+          
+        const apiToken = "6824b2d80fe347.44604306";
         const response = await fetch(
-          `https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=${selectedTicker}&apikey=${apiKey}`
+          `https://eodhd.com/api/eod/${cleanSymbol}?period=d&order=d&api_token=${apiToken}&fmt=json`
         );
         
         if (!response.ok) {
@@ -446,22 +520,60 @@ const RightPanel: React.FC<RightPanelProps> = ({ selectedCompany, selectedTicker
         
         const data = await response.json();
         
-        if (data["Time Series (Daily)"]) {
-          const prices: DailyPriceData[] = Object.entries(data["Time Series (Daily)"])
-            .map(([date, values]: [string, any]) => ({
-              date,
-              open: parseFloat(values["1. open"]),
-              high: parseFloat(values["2. high"]),
-              low: parseFloat(values["3. low"]),
-              close: parseFloat(values["4. close"]),
-              volume: parseInt(values["5. volume"])
-            }))
-            .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+        if (Array.isArray(data) && data.length > 0) {
+          // Get the most recent price for the stockData
+          const latestPrice = data[0]?.close || 0;
+          
+          // Update stockData with the latest price
+          setStockData(prevData => prevData ? {
+            ...prevData,
+            Price: latestPrice
+          } : null);
+          
+          // Transform the data for the chart (limit to 30 days)
+          const prices: DailyPriceData[] = data.slice(0, 30).map(item => ({
+            date: item.date,
+            open: item.open,
+            high: item.high,
+            low: item.low,
+            close: item.close,
+            volume: item.volume
+          })).reverse(); // Reverse to have older dates first
           
           setDailyPrices(prices);
         }
       } catch (error) {
         console.error('Error fetching daily prices:', error);
+        // Fallback to Alpha Vantage if EODHD fails
+        try {
+          const apiKey = "Z77KZQ17AVAUO1NW";
+          const response = await fetch(
+            `https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=${selectedTicker}&apikey=${apiKey}`
+          );
+          
+          if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+          }
+          
+          const data = await response.json();
+          
+          if (data["Time Series (Daily)"]) {
+            const prices: DailyPriceData[] = Object.entries(data["Time Series (Daily)"])
+              .map(([date, values]: [string, any]) => ({
+                date,
+                open: parseFloat(values["1. open"]),
+                high: parseFloat(values["2. high"]),
+                low: parseFloat(values["3. low"]),
+                close: parseFloat(values["4. close"]),
+                volume: parseInt(values["5. volume"])
+              }))
+              .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+            
+            setDailyPrices(prices);
+          }
+        } catch (fallbackError) {
+          console.error('Error with fallback to Alpha Vantage:', fallbackError);
+        }
       } finally {
         setIsLoadingPrices(false);
       }
@@ -546,25 +658,35 @@ const RightPanel: React.FC<RightPanelProps> = ({ selectedCompany, selectedTicker
     }
   };
 
-  const formatNumber = (value: string | undefined) => {
-    if (!value || value === 'None' || value === '') return 'N/A';
-    const num = parseFloat(value);
+  const formatNumber = (value: string | number | undefined) => {
+    if (value === undefined || value === null || value === 'None' || value === '') return 'N/A';
+    const num = typeof value === 'string' ? parseFloat(value) : value;
     if (isNaN(num)) return 'N/A';
     return num.toLocaleString('en-US', { maximumFractionDigits: 2 });
   };
 
-  const formatPercentage = (value: string | undefined) => {
-    if (!value || value === 'None' || value === '') return 'N/A';
-    const num = parseFloat(value);
+  const formatPercentage = (value: string | number | undefined) => {
+    if (value === undefined || value === null || value === 'None' || value === '') return 'N/A';
+    const num = typeof value === 'string' ? parseFloat(value) : value;
     if (isNaN(num)) return 'N/A';
     return `${(num * 100).toFixed(2)}%`;
   };
 
-  const formatCurrency = (value: string | undefined) => {
-    if (!value || value === 'None' || value === '') return 'N/A';
-    const num = parseFloat(value);
+  const formatCurrency = (value: string | number | undefined) => {
+    if (value === undefined || value === null || value === 'None' || value === '') return 'N/A';
+    const num = typeof value === 'string' ? parseFloat(value) : value;
     if (isNaN(num)) return 'N/A';
     return `$${num.toLocaleString('en-US', { maximumFractionDigits: 2 })}`;
+  };
+
+  // Helper function to get data based on whether we have EODHD data or Alpha Vantage data
+  const getData = (eodhdField: keyof EODHDCompanyOverview, alphaVantageField: keyof CompanyOverview) => {
+    if (stockData?.eodhd && stockData.eodhd[eodhdField] !== undefined) {
+      return stockData.eodhd[eodhdField];
+    } else if (stockData?.overview && stockData.overview[alphaVantageField] !== undefined) {
+      return stockData.overview[alphaVantageField];
+    }
+    return 'N/A';
   };
 
   return (
@@ -600,29 +722,29 @@ const RightPanel: React.FC<RightPanelProps> = ({ selectedCompany, selectedTicker
                 </button>
               </div>
               <p className="text-[#b9d6ee]/60 text-sm">
-                {stockData?.overview?.Sector || 'Sector not available'}
+                {stockData?.eodhd ? stockData.eodhd["General::Sector"] : (stockData?.overview?.Sector || 'Sector not available')}
               </p>
             </div>
-              </div>
+          </div>
               
-              {isLoading ? (
-                <div className="flex items-center justify-center h-32">
-                  <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-[#b9d6ee]"></div>
-                </div>
-              ) : stockData && (
-                <>
+          {isLoading ? (
+            <div className="flex items-center justify-center h-32">
+              <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-[#b9d6ee]"></div>
+            </div>
+          ) : stockData && (
+            <>
               <div className="mt-4 grid grid-cols-4 gap-6 w-full">
                 <div className="glass-panel p-4 rounded-xl border border-[#b9d6ee]/10 bg-gradient-to-br from-[#b9d6ee]/5 to-transparent backdrop-blur-lg shadow-glow">
                   <span className="text-sm uppercase tracking-wider text-[#b9d6ee]/70 font-medium">Price</span>
-                  <p className="text-2xl font-bold text-white mt-1">${parseFloat(stockData.Price).toFixed(2)}</p>
+                  <p className="text-2xl font-bold text-white mt-1">${typeof stockData.Price === 'number' ? stockData.Price.toFixed(2) : stockData.Price}</p>
                 </div>
                 <div className="glass-panel p-4 rounded-xl border border-[#b9d6ee]/10 bg-gradient-to-br from-[#b9d6ee]/5 to-transparent backdrop-blur-lg shadow-glow">
                   <span className="text-sm uppercase tracking-wider text-[#b9d6ee]/70 font-medium">Market Cap</span>
-                  <p className="text-2xl font-bold text-white mt-1">{formatMarketCap(stockData.overview?.MarketCapitalization)}</p>
+                  <p className="text-2xl font-bold text-white mt-1">{formatMarketCap(stockData.eodhd ? stockData.eodhd["Highlights::MarketCapitalization"] : stockData.overview?.MarketCapitalization)}</p>
                 </div>
                 <div className="glass-panel p-4 rounded-xl border border-[#b9d6ee]/10 bg-gradient-to-br from-[#b9d6ee]/5 to-transparent backdrop-blur-lg shadow-glow">
                   <span className="text-sm uppercase tracking-wider text-[#b9d6ee]/70 font-medium">Price Target</span>
-                  <p className="text-2xl font-bold text-white mt-1">{stockData.overview?.AnalystTargetPrice || 'N/A'}</p>
+                  <p className="text-2xl font-bold text-white mt-1">{stockData.eodhd ? formatCurrency(stockData.eodhd["AnalystRatings::TargetPrice"]) : (stockData.overview?.AnalystTargetPrice || 'N/A')}</p>
                 </div>
                 {!isLoading && stockData && (
                   <div className={`glass-panel p-4 rounded-xl border bg-gradient-to-br to-transparent backdrop-blur-lg shadow-glow ${getRatingBackground(portfolioTrend?.Rating)}`}>
@@ -646,19 +768,19 @@ const RightPanel: React.FC<RightPanelProps> = ({ selectedCompany, selectedTicker
                   <div className="grid grid-cols-2 gap-6">
                     <div>
                       <span className="text-sm text-[#b9d6ee]/70 font-medium">P/E Ratio</span>
-                      <p className="text-2xl font-bold text-white mt-1">{formatNumber(stockData.overview?.PERatio)}</p>
+                      <p className="text-2xl font-bold text-white mt-1">{formatNumber(stockData.eodhd ? stockData.eodhd["Valuation::TrailingPE"] : stockData.overview?.PERatio)}</p>
                     </div>
                     <div>
                       <span className="text-sm text-[#b9d6ee]/70 font-medium">P/B Ratio</span>
-                      <p className="text-2xl font-bold text-white mt-1">{formatNumber(stockData.overview?.PriceToBookRatio)}</p>
+                      <p className="text-2xl font-bold text-white mt-1">{formatNumber(stockData.eodhd ? stockData.eodhd["Valuation::PriceBookMRQ"] : stockData.overview?.PriceToBookRatio)}</p>
                     </div>
                     <div>
                       <span className="text-sm text-[#b9d6ee]/70 font-medium">Dividend Yield</span>
-                      <p className="text-2xl font-bold text-white mt-1">{formatPercentage(stockData.overview?.DividendYield)}</p>
+                      <p className="text-2xl font-bold text-white mt-1">{formatPercentage(stockData.eodhd ? stockData.eodhd["SplitsDividends::ForwardAnnualDividendYield"] : stockData.overview?.DividendYield)}</p>
                     </div>
                     <div>
                       <span className="text-sm text-[#b9d6ee]/70 font-medium">Beta</span>
-                      <p className="text-2xl font-bold text-white mt-1">{formatNumber(stockData.overview?.Beta)}</p>
+                      <p className="text-2xl font-bold text-white mt-1">{formatNumber(stockData.eodhd ? stockData.eodhd["Technicals::Beta"] : stockData.overview?.Beta)}</p>
                     </div>
                   </div>
                 </div>
@@ -671,19 +793,19 @@ const RightPanel: React.FC<RightPanelProps> = ({ selectedCompany, selectedTicker
                   <div className="grid grid-cols-2 gap-6">
                     <div>
                       <span className="text-sm text-[#b9d6ee]/70 font-medium">ROA</span>
-                      <p className="text-2xl font-bold text-white mt-1">{formatPercentage(stockData.overview?.ReturnOnAssetsTTM)}</p>
+                      <p className="text-2xl font-bold text-white mt-1">{formatPercentage(stockData.eodhd ? stockData.eodhd["Highlights::ReturnOnAssetsTTM"] : stockData.overview?.ReturnOnAssetsTTM)}</p>
                     </div>
                     <div>
                       <span className="text-sm text-[#b9d6ee]/70 font-medium">ROE</span>
-                      <p className="text-2xl font-bold text-white mt-1">{formatPercentage(stockData.overview?.ReturnOnEquityTTM)}</p>
+                      <p className="text-2xl font-bold text-white mt-1">{formatPercentage(stockData.eodhd ? stockData.eodhd["Highlights::ReturnOnEquityTTM"] : stockData.overview?.ReturnOnEquityTTM)}</p>
                     </div>
                     <div>
                       <span className="text-sm text-[#b9d6ee]/70 font-medium">Target Price</span>
-                      <p className="text-2xl font-bold text-white mt-1">{formatCurrency(stockData.overview?.AnalystTargetPrice)}</p>
+                      <p className="text-2xl font-bold text-white mt-1">{formatCurrency(stockData.eodhd ? stockData.eodhd["AnalystRatings::TargetPrice"] : stockData.overview?.AnalystTargetPrice)}</p>
                     </div>
                     <div>
                       <span className="text-sm text-[#b9d6ee]/70 font-medium">Ex-Dividend</span>
-                      <p className="text-2xl font-bold text-white mt-1">{stockData.overview?.ExDividendDate || 'N/A'}</p>
+                      <p className="text-2xl font-bold text-white mt-1">{stockData.eodhd ? stockData.eodhd["SplitsDividends::ExDividendDate"] : (stockData.overview?.ExDividendDate || 'N/A')}</p>
                     </div>
                   </div>
                 </div>
@@ -697,42 +819,84 @@ const RightPanel: React.FC<RightPanelProps> = ({ selectedCompany, selectedTicker
                     <div className="flex-1">
                       <div className="flex items-center justify-between mb-2">
                         <span className="text-sm text-[#b9d6ee]/70 font-medium">Buy</span>
-                        <span className="text-xl font-bold text-green-400">{stockData.overview?.AnalystRatingBuy || '0'}</span>
+                        <span className="text-xl font-bold text-green-400">
+                          {stockData.eodhd 
+                            ? (stockData.eodhd["AnalystRatings::StrongBuy"] + stockData.eodhd["AnalystRatings::Buy"]) 
+                            : (stockData.overview?.AnalystRatingBuy || '0')}
+                        </span>
                       </div>
                       <div className="h-2 bg-green-400/10 rounded-full overflow-hidden shadow-glow">
                         <div 
                           className="h-full bg-gradient-to-r from-green-400 to-green-300 rounded-full" 
-                          style={{ width: `${(parseInt(stockData.overview?.AnalystRatingBuy || '0') / (parseInt(stockData.overview?.AnalystRatingBuy || '0') + parseInt(stockData.overview?.AnalystRatingHold || '0') + parseInt(stockData.overview?.AnalystRatingSell || '0'))) * 100}%` }}
+                          style={{ 
+                            width: stockData.eodhd 
+                              ? `${((stockData.eodhd["AnalystRatings::StrongBuy"] + stockData.eodhd["AnalystRatings::Buy"]) / 
+                                  (stockData.eodhd["AnalystRatings::StrongBuy"] + stockData.eodhd["AnalystRatings::Buy"] + 
+                                   stockData.eodhd["AnalystRatings::Hold"] + stockData.eodhd["AnalystRatings::Sell"] + 
+                                   stockData.eodhd["AnalystRatings::StrongSell"])) * 100}%` 
+                              : `${(parseInt(stockData.overview?.AnalystRatingBuy || '0') / 
+                                  (parseInt(stockData.overview?.AnalystRatingBuy || '0') + 
+                                   parseInt(stockData.overview?.AnalystRatingHold || '0') + 
+                                   parseInt(stockData.overview?.AnalystRatingSell || '0'))) * 100}%`
+                          }}
                         ></div>
                       </div>
                     </div>
                     <div className="flex-1 mx-8">
                       <div className="flex items-center justify-between mb-2">
                         <span className="text-sm text-[#b9d6ee]/70 font-medium">Hold</span>
-                        <span className="text-xl font-bold text-yellow-400">{stockData.overview?.AnalystRatingHold || '0'}</span>
+                        <span className="text-xl font-bold text-yellow-400">
+                          {stockData.eodhd 
+                            ? stockData.eodhd["AnalystRatings::Hold"] 
+                            : (stockData.overview?.AnalystRatingHold || '0')}
+                        </span>
                       </div>
                       <div className="h-2 bg-yellow-400/10 rounded-full overflow-hidden shadow-glow">
                         <div 
                           className="h-full bg-gradient-to-r from-yellow-400 to-yellow-300 rounded-full" 
-                          style={{ width: `${(parseInt(stockData.overview?.AnalystRatingHold || '0') / (parseInt(stockData.overview?.AnalystRatingBuy || '0') + parseInt(stockData.overview?.AnalystRatingHold || '0') + parseInt(stockData.overview?.AnalystRatingSell || '0'))) * 100}%` }}
+                          style={{ 
+                            width: stockData.eodhd 
+                              ? `${(stockData.eodhd["AnalystRatings::Hold"] / 
+                                  (stockData.eodhd["AnalystRatings::StrongBuy"] + stockData.eodhd["AnalystRatings::Buy"] + 
+                                   stockData.eodhd["AnalystRatings::Hold"] + stockData.eodhd["AnalystRatings::Sell"] + 
+                                   stockData.eodhd["AnalystRatings::StrongSell"])) * 100}%` 
+                              : `${(parseInt(stockData.overview?.AnalystRatingHold || '0') / 
+                                  (parseInt(stockData.overview?.AnalystRatingBuy || '0') + 
+                                   parseInt(stockData.overview?.AnalystRatingHold || '0') + 
+                                   parseInt(stockData.overview?.AnalystRatingSell || '0'))) * 100}%`
+                          }}
                         ></div>
                       </div>
                     </div>
                     <div className="flex-1">
                       <div className="flex items-center justify-between mb-2">
                         <span className="text-sm text-[#b9d6ee]/70 font-medium">Sell</span>
-                        <span className="text-xl font-bold text-red-400">{stockData.overview?.AnalystRatingSell || '0'}</span>
+                        <span className="text-xl font-bold text-red-400">
+                          {stockData.eodhd 
+                            ? (stockData.eodhd["AnalystRatings::Sell"] + stockData.eodhd["AnalystRatings::StrongSell"]) 
+                            : (stockData.overview?.AnalystRatingSell || '0')}
+                        </span>
                       </div>
                       <div className="h-2 bg-red-400/10 rounded-full overflow-hidden shadow-glow">
                         <div 
                           className="h-full bg-gradient-to-r from-red-400 to-red-300 rounded-full" 
-                          style={{ width: `${(parseInt(stockData.overview?.AnalystRatingSell || '0') / (parseInt(stockData.overview?.AnalystRatingBuy || '0') + parseInt(stockData.overview?.AnalystRatingHold || '0') + parseInt(stockData.overview?.AnalystRatingSell || '0'))) * 100}%` }}
+                          style={{ 
+                            width: stockData.eodhd 
+                              ? `${((stockData.eodhd["AnalystRatings::Sell"] + stockData.eodhd["AnalystRatings::StrongSell"]) / 
+                                  (stockData.eodhd["AnalystRatings::StrongBuy"] + stockData.eodhd["AnalystRatings::Buy"] + 
+                                   stockData.eodhd["AnalystRatings::Hold"] + stockData.eodhd["AnalystRatings::Sell"] + 
+                                   stockData.eodhd["AnalystRatings::StrongSell"])) * 100}%` 
+                              : `${(parseInt(stockData.overview?.AnalystRatingSell || '0') / 
+                                  (parseInt(stockData.overview?.AnalystRatingBuy || '0') + 
+                                   parseInt(stockData.overview?.AnalystRatingHold || '0') + 
+                                   parseInt(stockData.overview?.AnalystRatingSell || '0'))) * 100}%`
+                          }}
                         ></div>
                       </div>
                     </div>
                   </div>
                 </div>
-
+            
                 <div className="col-span-1 lg:col-span-2">
                   <AIRecommendationPanel 
                     recommendation={aiRecommendation}
@@ -746,13 +910,6 @@ const RightPanel: React.FC<RightPanelProps> = ({ selectedCompany, selectedTicker
           
           {selectedTicker && (
             <>
-              {/* <div className="mt-6 w-full">
-                <StockChart 
-                  ticker={selectedTicker} 
-                  companyName={selectedCompany || ''}
-                />
-              </div> */}
-
               <div className="mt-6 w-full glass-panel p-6 rounded-xl border border-[#b9d6ee]/10 bg-gradient-to-br from-[#b9d6ee]/5 to-transparent backdrop-blur-lg shadow-glow">
                 <h3 className="text-lg font-semibold mb-6 text-[#b9d6ee] flex items-center">
                   <span className="mr-2">Daily Price Chart</span>

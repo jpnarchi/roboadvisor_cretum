@@ -212,12 +212,15 @@ const MarketReports: React.FC<MarketReportsProps> = ({ searchQuery, onSearchChan
           <div className="mb-4">
             <h3 className="text-xl font-bold text-[#b9d6ee]">{selectedReport.stock_symbol}</h3>
             <p className="text-sm text-[#b9d6ee]/70">{selectedReport.title}</p>
+            <p className="text-xs text-[#b9d6ee]/50 mt-1">
+              {getFileName(selectedReport.file_url)}
+            </p>
           </div>
           <div className="flex-1 overflow-hidden">
             <iframe
               src={`${selectedReport.file_url}#toolbar=0`}
               className="w-full h-full rounded-lg"
-              title={selectedReport.title}
+              title={getFileName(selectedReport.file_url)}
             />
           </div>
         </div>

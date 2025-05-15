@@ -13,7 +13,7 @@ import StockTicker from './components/StockTicker';
 interface StockData {
   symbol: string;
   name: string;
-  market: 'US' | 'XETRA' | 'LSE' | 'TSX' | 'TSXV' | 'BSE' | 'SSE' | 'SZSE';
+  market: 'US' | 'XETRA' | 'LSE' | 'TSX' | 'TSXV' | 'BSE' | 'SSE' | 'SZSE' | 'MX';
   change?: number;
   price?: number;
   loading?: boolean;
@@ -145,7 +145,9 @@ const stockTickers: StockData[] = [
   // Chinese Stocks (Shenzhen Stock Exchange)
   { symbol: '000002.SHZ', name: 'China Vanke Co., Ltd.', market: 'SZSE' },
   { symbol: '000651.SHZ', name: 'Gree Electric Appliances Inc. of Zhuhai', market: 'SZSE' },
-  { symbol: '000333.SHZ', name: 'Midea Group Co., Ltd.', market: 'SZSE' }
+  { symbol: '000333.SHZ', name: 'Midea Group Co., Ltd.', market: 'SZSE' },
+
+  { symbol: 'FEMSAUBD', name: 'Grupo Femsa', market: 'MX' }
 ];
 
 function App() {
@@ -188,6 +190,8 @@ function App() {
         return symbol.replace('.SHH', '.SS');
       case 'SZSE':
         return symbol.replace('.SHZ', '.SZ');
+      case 'MX':
+        return symbol.replace('.MX', '.MX');
       default:
         return `${symbol}.US`;
     }
