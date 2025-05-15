@@ -181,6 +181,7 @@ const RightPanel: React.FC<RightPanelProps> = ({ selectedCompany, selectedTicker
       
       const apiToken = "6824b2d80fe347.44604306"; // Your EODHD API token
       const filters = [
+      
         "General::Code",
         "General::Sector",
         "Highlights::MarketCapitalization",
