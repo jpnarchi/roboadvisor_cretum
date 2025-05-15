@@ -604,7 +604,7 @@ const RightPanel: React.FC<RightPanelProps> = ({ selectedCompany, selectedTicker
               <div className="flex items-center justify-between w-full">
                 <div className="flex items-center gap-3 mb-2">
                   <h2 className="text-4xl font-extrabold tracking-tight bg-gradient-to-r from-white to-[#b9d6ee] bg-clip-text text-transparent">{selectedCompany}</h2>
-                  {selectedTicker && (
+                {selectedTicker && (
                     <div className="flex items-center gap-2">
                       <span className="text-lg font-bold text-[#b9d6ee] bg-[#b9d6ee]/5 px-4 py-1.5 rounded-lg border border-[#b9d6ee]/20 shadow-glow">
                         ({selectedTicker})
@@ -622,12 +622,12 @@ const RightPanel: React.FC<RightPanelProps> = ({ selectedCompany, selectedTicker
                 {stockData?.eodhd ? stockData.eodhd["General::Sector"] : (stockData?.overview?.Sector || 'Sector not available')}
               </p>
             </div>
-          </div>
-          
-          {isLoading ? (
-            <div className="flex items-center justify-center h-32">
-              <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-[#b9d6ee]"></div>
-            </div>
+              </div>
+              
+              {isLoading ? (
+                <div className="flex items-center justify-center h-32">
+                  <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-[#b9d6ee]"></div>
+                </div>
           ) : stockData && (
             <>
               <div className="mt-4 grid grid-cols-4 gap-6 w-full">
