@@ -1,8 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Search, FileText, Download, Calendar, TrendingUp, Filter } from 'lucide-react';
-import { searchReports, MarketReport } from '../services/supabaseService';
-import ProcessFiles from './ProcessFiles';
-import StockChart from './StockChart';
+import { Search, Download } from 'lucide-react';
+import { searchReports } from '../services/supabaseService';
 
 interface Report {
   id: string;
@@ -34,7 +32,7 @@ const MarketReports: React.FC<MarketReportsProps> = ({ searchQuery, onSearchChan
     setError(null);
 
     try {
-      const results = await searchReports('');
+      const results = await searchReports();
       console.log('Fetched all reports:', results);
       setAllReports(results);
       setReports(results);

@@ -1,7 +1,7 @@
 {
   "name": "roboadvisor",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -10,20 +10,26 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.49.4",
-    "@types/pdfjs-dist": "^2.10.377",
-    "chart.js": "^4.4.9",
-    "html2pdf.js": "^0.10.1",
-    "lucide-react": "^0.330.0",
-    "pdfjs-dist": "^5.2.133",
+    "@radix-ui/react-dialog": "^1.0.5",
+    "@radix-ui/react-dropdown-menu": "^2.0.6",
+    "@radix-ui/react-slot": "^1.0.2",
+    "@supabase/supabase-js": "^2.39.3",
+    "chart.js": "^4.4.1",
+    "class-variance-authority": "^0.7.0",
+    "clsx": "^2.1.0",
+    "lucide-react": "^0.323.0",
+    "openai": "^4.98.0",
     "react": "^18.2.0",
-    "react-chartjs-2": "^5.3.0",
+    "react-chartjs-2": "^5.2.0",
     "react-dom": "^18.2.0",
-    "react-markdown": "^9.0.1",
-    "react-toastify": "^10.0.4",
-    "remark-gfm": "^4.0.0"
+    "react-markdown": "^10.1.0",
+    "react-toastify": "^11.0.5",
+    "remark-gfm": "^4.0.1",
+    "tailwind-merge": "^2.2.1",
+    "tailwindcss-animate": "^1.0.7"
   },
   "devDependencies": {
+    "@types/node": "^20.11.19",
     "@types/react": "^18.2.55",
     "@types/react-dom": "^18.2.19",
     "@typescript-eslint/eslint-plugin": "^6.21.0",

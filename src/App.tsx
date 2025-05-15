@@ -1,11 +1,11 @@
-import React, { useState, useEffect } from 'react';
-import { Search, Download } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Download } from 'lucide-react';
 import RightPanel from './components/RightPanel';
 import { updateData, getLastUpdateTime } from './services/dataService';
 import { toast } from 'react-toastify';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
-import { updateCompanyData, getCompanyData } from './services/companyService';
+import { updateCompanyData } from './services/companyService';
 import AIAssistant from './components/AIAssistant';
 import MarketReports from './components/MarketReports';
 import StockTicker from './components/StockTicker';
@@ -18,49 +18,6 @@ interface StockData {
   price?: number;
   loading?: boolean;
   error?: string;
-}
-
-interface StockOverview {
-  Symbol: string;
-  Name: string;
-  Description: string;
-  Sector: string;
-  Industry: string;
-  MarketCapitalization: string;
-  PERatio: string;
-  PEGRatio: string;
-  BookValue: string;
-  DividendPerShare: string;
-  DividendYield: string;
-  EPS: string;
-  RevenuePerShareTTM: string;
-  ProfitMargin: string;
-  OperatingMarginTTM: string;
-  ReturnOnAssetsTTM: string;
-  ReturnOnEquityTTM: string;
-  RevenueTTM: string;
-  GrossProfitTTM: string;
-  DilutedEPSTTM: string;
-  QuarterlyEarningsGrowthYOY: string;
-  QuarterlyRevenueGrowthYOY: string;
-  AnalystTargetPrice: string;
-  TrailingPE: string;
-  ForwardPE: string;
-  PriceToSalesRatioTTM: string;
-  PriceToBookRatio: string;
-  EVToRevenue: string;
-  EVToEBITDA: string;
-  Beta: string;
-  "52WeekHigh": string;
-  "52WeekLow": string;
-  "50DayMovingAverage": string;
-  "200DayMovingAverage": string;
-  SharesOutstanding: string;
-  DividendDate: string;
-  ExDividendDate: string;
-  AnalystRatingBuy: string;
-  AnalystRatingHold: string;
-  AnalystRatingSell: string;
 }
 
 // Interfaz para la respuesta de la API EODHD
@@ -153,12 +110,9 @@ const stockTickers: StockData[] = [
 function App() {
   const [currentView, setCurrentView] = useState<'dashboard' | 'reports'>('dashboard');
   const [searchQuery, setSearchQuery] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  // Inicializar stocks como un array vacío y luego llenarlo después
-  const [stocks, setStocks] = useState<StockData[]>([]);
+  const [stocks, setStocks] = useState<StockData[]>(stockTickers);
   const [selectedCompany, setSelectedCompany] = useState<string | null>(null);
   const [selectedTicker, setSelectedTicker] = useState<string | null>(null);
-  const [isLoadingStocks, setIsLoadingStocks] = useState(true);
   const [lastUpdate, setLastUpdate] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
   const [isExporting, setIsExporting] = useState(false);
@@ -195,18 +149,6 @@ function App() {
       default:
         return `${symbol}.US`;
     }
-  };
-
-  const generateSampleStockData = (symbol: string) => {
-    const basePrice = 100 + Math.random() * 900;
-    const change = (Math.random() * 10 - 5).toFixed(2);
-    return {
-      symbol,
-      name: stockTickers.find(s => s.symbol === symbol)?.name || '',
-      price: basePrice,
-      change: parseFloat(change),
-      loading: false
-    };
   };
 
   const fetchStockData = async (ticker: string): Promise<StockData> => {
@@ -256,7 +198,6 @@ function App() {
 
   useEffect(() => {
     const loadAllStocks = async () => {
-      setIsLoadingStocks(true);
       setError(null);
       
       try {
@@ -273,7 +214,7 @@ function App() {
         
         // Update company overview data first
         console.log('Updating company overview data...');
-        const companyData = await updateCompanyData(tickers.join(','));
+        await updateCompanyData(tickers.join(','));
         console.log('Company overview data updated');
         
         // Fetch stock data with delay between calls
@@ -322,8 +263,6 @@ function App() {
       } catch (error) {
         console.error('Error loading stocks:', error);
         setError('Error loading stock data. Please try again later.');
-      } finally {
-        setIsLoadingStocks(false);
       }
     };
 
@@ -355,12 +294,10 @@ function App() {
   };
 
   const handleStockClick = async (symbol: string) => {
-    if (isLoading) return;
-    const analysisPrompt = `Dame un análisis de ${symbol}`;
-    setSelectedTicker(symbol);
     const stock = stocks.find(s => s.symbol === symbol);
     if (stock) {
       setSelectedCompany(stock.name);
+      setSelectedTicker(symbol);
     }
   };
 

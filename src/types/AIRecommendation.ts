@@ -1,6 +1,6 @@
-export type RecommendationType = 'BUY' | 'HOLD' | 'SELL';
+export type AIRecommendation = 'STRONG_BUY' | 'BUY' | 'NEUTRAL' | 'SELL' | 'STRONG_SELL';
 
-export interface AIRecommendation {
-  recommendation: RecommendationType;
+export interface AIResponse {
+  recommendation: AIRecommendation;
   explanation: string;
 } 

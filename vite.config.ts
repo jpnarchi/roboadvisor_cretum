@@ -7,7 +7,14 @@ export default defineConfig({
   plugins: [react()],
   server: {
     port: 3000,
-    open: true
+    open: true,
+    proxy: {
+      '/api': {
+        target: 'http://localhost:3000',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api/, '')
+      }
+    }
   },
   resolve: {
     alias: {
@@ -21,7 +28,8 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks: {
-          pdfjs: ['pdfjs-dist'],
+          vendor: ['react', 'react-dom'],
+          chartjs: ['chart.js', 'react-chartjs-2'],
         },
       },
     },

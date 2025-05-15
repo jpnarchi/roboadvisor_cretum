@@ -8,7 +8,7 @@ if (!supabaseUrl || !supabaseKey) {
   throw new Error('Missing Supabase credentials');
 }
 
-export const supabase = createClient(supabaseUrl, supabaseKey);
+const supabase = createClient(supabaseUrl, supabaseKey);
 
 export interface MarketReport {
   id: string;
@@ -91,28 +91,15 @@ export const processAllFiles = async () => {
   }
 };
 
-export const searchReports = async (query: string) => {
+export const searchReports = async () => {
   try {
-    let queryBuilder = supabase
-      .from('market_reports')
-      .select('*');
-
-    if (query.trim()) {
-      // Si hay búsqueda, aplicar filtros y ordenar por fecha
-      queryBuilder = queryBuilder
-        .or(`title.ilike.%${query}%,description.ilike.%${query}%,stock_symbol.ilike.%${query}%`)
-        .order('created_at', { ascending: false });
-    } else {
-      // Si no hay búsqueda, obtener todos los registros ordenados por fecha
-      queryBuilder = queryBuilder
-        .order('created_at', { ascending: false });
-    }
-
-    const { data, error } = await queryBuilder;
+    const { data, error } = await supabase
+      .from('reports')
+      .select('*')
+      .order('created_at', { ascending: false });
 
     if (error) throw error;
-
-    return data as MarketReport[];
+    return data || [];
   } catch (error) {
     console.error('Error searching reports:', error);
     throw error;
@@ -121,23 +108,20 @@ export const searchReports = async (query: string) => {
 
 export const uploadReport = async (file: File, reportData: Omit<MarketReport, 'id' | 'created_at' | 'file_url'>) => {
   try {
-    // 1. Subir el archivo a Supabase Storage
     const fileExt = file.name.split('.').pop();
     const fileName = `${Math.random()}.${fileExt}`;
     const filePath = `reports/${fileName}`;
 
-    const { data: fileData, error: uploadError } = await supabase.storage
+    const { error: uploadError } = await supabase.storage
       .from('marketreports')
       .upload(filePath, file);
 
     if (uploadError) throw uploadError;
 
-    // 2. Obtener la URL pública del archivo
     const { data: { publicUrl } } = supabase.storage
       .from('marketreports')
       .getPublicUrl(filePath);
 
-    // 3. Crear el registro en la base de datos
     const { data, error } = await supabase
       .from('market_reports')
       .insert([

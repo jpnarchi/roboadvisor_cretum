@@ -1,173 +1,186 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { AIRecommendation } from '../types/AIRecommendation';
 
-interface AIRecommendationPanelProps {
-  recommendation: AIRecommendation | null;
-  isLoading: boolean;
-  companyOverview?: {
-    Symbol: string;
-    Name: string;
-    PERatio: string;
-    PEGRatio: string;
-    DividendYield: string;
-    EPS: string;
-    ProfitMargin: string;
-    OperatingMarginTTM: string;
-    ReturnOnEquityTTM: string;
-    QuarterlyEarningsGrowthYOY: string;
-    QuarterlyRevenueGrowthYOY: string;
-    AnalystTargetPrice: string;
-    Beta: string;
-    "52WeekHigh": string;
-    "52WeekLow": string;
-    AnalystRatingBuy: string;
-    AnalystRatingHold: string;
-    AnalystRatingSell: string;
-  };
+interface CompanyOverview {
+  Symbol: string;
+  Name: string;
+  Description: string;
+  Sector: string;
+  Industry: string;
+  MarketCapitalization: string;
+  PERatio: string;
+  PEGRatio: string;
+  BookValue: string;
+  DividendPerShare: string;
+  DividendYield: string;
+  EPS: string;
+  RevenuePerShareTTM: string;
+  ProfitMargin: string;
+  OperatingMarginTTM: string;
+  ReturnOnAssetsTTM: string;
+  ReturnOnEquityTTM: string;
+  RevenueTTM: string;
+  GrossProfitTTM: string;
+  DilutedEPSTTM: string;
+  QuarterlyEarningsGrowthYOY: string;
+  QuarterlyRevenueGrowthYOY: string;
+  AnalystTargetPrice: string;
+  TrailingPE: string;
+  ForwardPE: string;
+  PriceToSalesRatioTTM: string;
+  PriceToBookRatio: string;
+  EVToRevenue: string;
+  EVToEBITDA: string;
+  Beta: string;
+  "52WeekHigh": string;
+  "52WeekLow": string;
+  "50DayMovingAverage": string;
+  "200DayMovingAverage": string;
+  SharesOutstanding: string;
+  DividendDate: string;
+  ExDividendDate: string;
+  AnalystRatingBuy: string;
+  AnalystRatingHold: string;
+  AnalystRatingSell: string;
 }
 
-// Añadir la declaración de tipos para import.meta.env
-declare global {
-  interface ImportMeta {
-    env: {
-      VITE_OPEN_AI_API_KEY: string;
-    }
-  }
+interface AIRecommendationPanelProps {
+  companyOverview?: CompanyOverview;
+  recommendation?: AIRecommendation | null;
+  explanation?: string;
 }
 
 const AIRecommendationPanel: React.FC<AIRecommendationPanelProps> = ({ 
-  recommendation, 
-  isLoading,
-  companyOverview 
+  companyOverview,
+  recommendation,
+  explanation 
 }) => {
-  const [aiResponse, setAiResponse] = useState<string | null>(null);
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [recommendationType, setRecommendationType] = useState<'BUY' | 'HOLD' | 'SELL' | null>(null);
+  console.log('AIRecommendationPanel received props:', { recommendation, explanation });
 
-  useEffect(() => {
-    const getAIRecommendation = async () => {
-      if (!companyOverview) {
-        console.log('No company overview data available');
-        return;
-      }
-
-      setIsAnalyzing(true);
-      setError(null);
-      setAiResponse(null);
-      setRecommendationType(null);
-
-      try {
-        const apiKey = import.meta.env.VITE_OPEN_AI_API_KEY;
-        if (!apiKey) {
-          throw new Error('API key no configurada. Verifica tus variables de entorno.');
-        }
-
-        const systemPrompt = `Eres un analista financiero experto. Analiza los siguientes datos y proporciona una recomendación clara (BUY, HOLD, o SELL) en tres oraciones concisas.`;
-
-        console.log('Enviando solicitud a OpenAI API');
-
-        const response = await fetch('https://api.openai.com/v1/chat/completions', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${apiKey}`
-          },
-          body: JSON.stringify({
-            model: "gpt-3.5-turbo",
-            messages: [
-              { role: "system", content: systemPrompt },
-              { role: "user", content: JSON.stringify(companyOverview, null, 2) }
-            ],
-            temperature: 0.7,
-            max_tokens: 250
-          })
-        });
-
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(
-            `Error en la API de OpenAI: ${errorData.error?.message || response.statusText}`
-          );
-        }
-
-        const data = await response.json();
-        
-        if (!data.choices || !data.choices[0]?.message?.content) {
-          throw new Error('Formato de respuesta inesperado de la API');
-        }
-        
-        const rawResponse = data.choices[0].message.content;
-        console.log('Respuesta de OpenAI:', rawResponse);
-        setAiResponse(rawResponse);
-
-        // Extraer la recomendación del texto
-        const recommendationMatch = rawResponse.match(/\b(BUY|HOLD|SELL)\b/i);
-        if (recommendationMatch) {
-          setRecommendationType(recommendationMatch[1].toUpperCase() as 'BUY' | 'HOLD' | 'SELL');
-        }
-        
-      } catch (error: any) {
-        console.error('Error al obtener recomendación de IA:', error);
-        setError(error.message);
-      } finally {
-        setIsAnalyzing(false);
-      }
-    };
-
-    getAIRecommendation();
-  }, [companyOverview]);
-
-  // Solo mostrar el spinner cuando estamos analizando y no hay respuesta previa
-  if (isAnalyzing && !aiResponse) {
-    return (
-      <div className="glass-panel p-4 rounded-lg border border-[#b9d6ee]/10 col-span-2 mt-6">
-        <div className="flex justify-center items-center h-32">
-          <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-[#b9d6ee]"></div>
-        </div>
-      </div>
-    );
-  }
-
-  // Si no hay respuesta y no hay error, no mostrar nada
-  if (!aiResponse && !error) {
-    return null;
-  }
-
-  const getRecommendationColor = (type: string | null) => {
-    switch (type) {
+  const getRecommendationColor = (rec: AIRecommendation | null | undefined) => {
+    if (!rec) return 'text-gray-500';
+    switch (rec) {
+      case 'STRONG_BUY':
       case 'BUY':
         return 'text-green-400';
-      case 'SELL':
-        return 'text-red-400';
-      case 'HOLD':
+      case 'NEUTRAL':
         return 'text-yellow-400';
+      case 'SELL':
+      case 'STRONG_SELL':
+        return 'text-red-400';
       default:
-        return 'text-[#b9d6ee]';
+        return 'text-gray-500';
     }
   };
 
+  const getRecommendationBackground = (rec: AIRecommendation | null | undefined) => {
+    if (!rec) return 'from-gray-500/5 border-gray-500/30';
+    switch (rec) {
+      case 'STRONG_BUY':
+      case 'BUY':
+        return 'from-green-400/5 border-green-400/30';
+      case 'NEUTRAL':
+        return 'from-yellow-400/5 border-yellow-400/30';
+      case 'SELL':
+      case 'STRONG_SELL':
+        return 'from-red-400/5 border-red-400/30';
+      default:
+        return 'from-gray-500/5 border-gray-500/30';
+    }
+  };
+
+  const formatMetric = (value: string | undefined) => {
+    if (!value || value === 'N/A') return 'N/A';
+    const num = parseFloat(value);
+    if (isNaN(num)) return value;
+    return num.toLocaleString('en-US', { maximumFractionDigits: 2 });
+  };
+
+  const getMetricColor = (value: string | undefined, type: 'positive' | 'negative') => {
+    if (!value || value === 'N/A') return 'text-gray-500';
+    const num = parseFloat(value);
+    if (isNaN(num)) return 'text-gray-500';
+    
+    if (type === 'positive') {
+      if (num > 0) return 'text-green-400';
+      if (num < 0) return 'text-red-400';
+    } else {
+      if (num > 0) return 'text-red-400';
+      if (num < 0) return 'text-green-400';
+    }
+    return 'text-gray-500';
+  };
+
   return (
-    <div className="glass-panel p-4 rounded-lg border border-[#b9d6ee]/10 col-span-2 mt-6">
-      <div className="flex flex-col">
-        <div className="flex justify-between items-center mb-4">
-          <h3 className="text-lg font-semibold text-[#b9d6ee]">AI Analysis</h3>
-          {recommendationType && (
-            <span className={`text-lg font-bold ${getRecommendationColor(recommendationType)}`}>
-              {recommendationType}
+    <div className="glass-panel p-6 rounded-xl border border-[#b9d6ee]/10 bg-gradient-to-br from-[#b9d6ee]/5 to-transparent backdrop-blur-lg shadow-glow">
+      <h3 className="text-lg font-semibold mb-6 text-[#b9d6ee] flex items-center">
+        <span className="mr-2">AI Analysis</span>
+        <div className="h-px flex-1 bg-gradient-to-r from-[#b9d6ee]/20 to-transparent"></div>
+      </h3>
+      <div className="space-y-4">
+        <div className={`p-4 rounded-lg border ${getRecommendationBackground(recommendation)}`}>
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-[#b9d6ee]/70 font-medium">Recommendation</span>
+            <span className={`text-xl font-bold ${getRecommendationColor(recommendation)}`}>
+              {recommendation || 'N/A'}
             </span>
-          )}
+          </div>
         </div>
-        
-        {error && (
-          <div className="mb-4 p-2 bg-red-400/10 border border-red-400/30 rounded-lg text-red-300 text-sm">
-            Error: {error}
+
+        <div className="text-[#b9d6ee]/80">
+          <p className="font-medium mb-2">Analysis:</p>
+          <p>{explanation || 'No analysis available.'}</p>
+        </div>
+
+        {companyOverview && (
+          <div className="grid grid-cols-2 gap-4 mt-4">
+            <div className="space-y-2">
+              <div>
+                <span className="text-sm text-[#b9d6ee]/70">P/E Ratio</span>
+                <p className={`text-lg font-semibold ${getMetricColor(companyOverview.PERatio, 'negative')}`}>
+                  {formatMetric(companyOverview.PERatio)}
+                </p>
+              </div>
+              <div>
+                <span className="text-sm text-[#b9d6ee]/70">PEG Ratio</span>
+                <p className={`text-lg font-semibold ${getMetricColor(companyOverview.PEGRatio, 'negative')}`}>
+                  {formatMetric(companyOverview.PEGRatio)}
+                </p>
+              </div>
+              <div>
+                <span className="text-sm text-[#b9d6ee]/70">Dividend Yield</span>
+                <p className={`text-lg font-semibold ${getMetricColor(companyOverview.DividendYield, 'positive')}`}>
+                  {formatMetric(companyOverview.DividendYield)}%
+                </p>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <div>
+                <span className="text-sm text-[#b9d6ee]/70">Return on Equity</span>
+                <p className={`text-lg font-semibold ${getMetricColor(companyOverview.ReturnOnEquityTTM, 'positive')}`}>
+                  {formatMetric(companyOverview.ReturnOnEquityTTM)}%
+                </p>
+              </div>
+              <div>
+                <span className="text-sm text-[#b9d6ee]/70">Profit Margin</span>
+                <p className={`text-lg font-semibold ${getMetricColor(companyOverview.ProfitMargin, 'positive')}`}>
+                  {formatMetric(companyOverview.ProfitMargin)}%
+                </p>
+              </div>
+              <div>
+                <span className="text-sm text-[#b9d6ee]/70">Beta</span>
+                <p className={`text-lg font-semibold ${getMetricColor(companyOverview.Beta, 'negative')}`}>
+                  {formatMetric(companyOverview.Beta)}
+                </p>
+              </div>
+            </div>
           </div>
         )}
-        
-        {aiResponse && (
-          <div className="p-4 rounded-lg bg-[#b9d6ee]/5 border border-[#b9d6ee]/20">
-            <p className="text-[#b9d6ee] whitespace-pre-wrap">{aiResponse}</p>
+
+        {companyOverview?.Description && (
+          <div className="text-[#b9d6ee]/80 mt-4">
+            <p className="font-medium mb-2">Company Overview:</p>
+            <p>{companyOverview.Description}</p>
           </div>
         )}
       </div>
