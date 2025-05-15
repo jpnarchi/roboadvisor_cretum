@@ -94,7 +94,7 @@ export const processAllFiles = async () => {
 export const searchReports = async () => {
   try {
     const { data, error } = await supabase
-      .from('reports')
+      .from('market_reports')
       .select('*')
       .order('created_at', { ascending: false });
 

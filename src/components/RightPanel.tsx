@@ -239,6 +239,10 @@ const RightPanel: React.FC<RightPanelProps> = ({ selectedCompany, selectedTicker
         // Fetch data from EODHD API
         const eodhdData = await fetchCompanyDataFromEODHD(selectedTicker);
         
+        // Fetch daily price data first to ensure we have a price
+        const priceData = await fetchDailyPrices(selectedTicker);
+        const currentPrice = priceData?.close || 0;
+        
         if (eodhdData) {
           // Create the stockData object with EODHD data
           const newStockData: StockData = {
@@ -247,7 +251,7 @@ const RightPanel: React.FC<RightPanelProps> = ({ selectedCompany, selectedTicker
             Sector: eodhdData["General::Sector"] || "N/A",
             Rating: eodhdData["AnalystRatings::Rating"] || "N/A",
             "Rated On": "Not rated",
-            Price: 0, // Will be updated with daily price data
+            Price: currentPrice, // Use the fetched price
             eodhd: eodhdData,
             market: selectedTicker.includes('.BMV') ? 'Mexico' :
                     selectedTicker.includes('.DEX') ? 'XETRA' :
@@ -276,7 +280,7 @@ const RightPanel: React.FC<RightPanelProps> = ({ selectedCompany, selectedTicker
             Sector: companyData.Sector || "N/A",
             Rating: "N/A",
             "Rated On": "Not rated",
-            Price: companyData["50DayMovingAverage"] || "N/A",
+            Price: currentPrice || companyData["50DayMovingAverage"] || "N/A", // Use fetched price or fallback
             overview: companyData,
             market: selectedTicker.includes('.BMV') ? 'Mexico' :
                     selectedTicker.includes('.DEX') ? 'XETRA' :
@@ -290,7 +294,8 @@ const RightPanel: React.FC<RightPanelProps> = ({ selectedCompany, selectedTicker
         }
       } catch (error) {
         console.error('Error fetching data:', error);
-        setStockData(null);
+        // Don't set stockData to null, keep previous data
+        setIsLoading(false);
       } finally {
         setIsLoading(false);
       }
@@ -298,6 +303,39 @@ const RightPanel: React.FC<RightPanelProps> = ({ selectedCompany, selectedTicker
     
     fetchData();
   }, [selectedTicker]);
+
+  // Separate function to fetch daily prices
+  const fetchDailyPrices = async (ticker: string): Promise<{ close: number } | null> => {
+    try {
+      // Clean up the ticker symbol
+      const cleanSymbol = ticker.includes('.') 
+        ? `${ticker.split('.')[0]}.${ticker.split('.')[1] === 'BMV' ? 'MX' : 
+           ticker.split('.')[1] === 'DEX' ? 'DE' : 
+           ticker.split('.')[1] === 'LON' ? 'GB' : 
+           ticker.split('.')[1] === 'MIL' ? 'IT' : 'US'}`
+        : `${ticker}.US`;
+          
+      const apiToken = "6824b2d80fe347.44604306";
+      const response = await fetch(
+        `https://eodhd.com/api/fundamentals/${cleanSymbol}?filter=General::Code,General::Sector,Highlights::MarketCapitalization,Valuation::TrailingPE,Valuation::PriceBookMRQ,SplitsDividends::ForwardAnnualDividendYield,Technicals::Beta,Highlights::ReturnOnAssetsTTM,Highlights::ReturnOnEquityTTM,AnalystRatings::TargetPrice,SplitsDividends::ExDividendDate,AnalystRatings::Rating,AnalystRatings::StrongBuy,AnalystRatings::Buy,AnalystRatings::Hold,AnalystRatings::Sell,AnalystRatings::StrongSell&api_token=${apiToken}&fmt=json`
+      );
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      
+      if (Array.isArray(data) && data.length > 0) {
+        return { close: data[0].close };
+      }
+      
+      return null;
+    } catch (error) {
+      console.error('Error fetching daily prices:', error);
+      return null;
+    }
+  };
 
   useEffect(() => {
     const fetchPortfolioTrend = async () => {
@@ -412,82 +450,6 @@ const RightPanel: React.FC<RightPanelProps> = ({ selectedCompany, selectedTicker
     // Clean up interval
     return () => clearInterval(intervalId);
   }, [selectedTicker, selectedCompany]);
-
-  // Updated to use EODHD for daily prices as well
-  useEffect(() => {
-    const fetchDailyPrices = async () => {
-      if (!selectedTicker) return;
-      
-      try {
-        // Clean up the ticker symbol by removing market extensions if needed
-        const cleanSymbol = selectedTicker.includes('.') 
-          ? `${selectedTicker.split('.')[0]}.${selectedTicker.split('.')[1] === 'BMV' ? 'MX' : 
-             selectedTicker.split('.')[1] === 'DEX' ? 'DE' : 
-             selectedTicker.split('.')[1] === 'LON' ? 'GB' : 
-             selectedTicker.split('.')[1] === 'MIL' ? 'IT' : 'US'}`
-          : `${selectedTicker}.US`;
-          
-        const apiToken = "6824b2d80fe347.44604306";
-        const response = await fetch(
-          `https://eodhd.com/api/eod/${cleanSymbol}?period=d&order=d&api_token=${apiToken}&fmt=json`
-        );
-        
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        
-        const data = await response.json();
-        
-        if (Array.isArray(data) && data.length > 0) {
-          // Get the most recent price for the stockData
-          const latestPrice = data[0]?.close || 0;
-          
-          // Update stockData with the latest price
-          setStockData(prevData => prevData ? {
-            ...prevData,
-            Price: latestPrice
-          } : null);
-        }
-      } catch (error) {
-        console.error('Error fetching daily prices:', error);
-        // Fallback to Alpha Vantage if EODHD fails
-        try {
-          const apiKey = "Z77KZQ17AVAUO1NW";
-          const response = await fetch(
-            `https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=${selectedTicker}&apikey=${apiKey}`
-          );
-          
-          if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-          }
-          
-          const data = await response.json();
-          
-          if (data["Time Series (Daily)"]) {
-            const prices: DailyPriceData[] = Object.entries(data["Time Series (Daily)"])
-              .map(([date, values]: [string, any]) => ({
-                date,
-                open: parseFloat(values["1. open"]),
-                high: parseFloat(values["2. high"]),
-                low: parseFloat(values["3. low"]),
-                close: parseFloat(values["4. close"]),
-                volume: parseInt(values["5. volume"])
-              }))
-              .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-            
-            setStockData(prevData => prevData ? {
-              ...prevData,
-              Price: prices[0].close
-            } : null);
-          }
-        } catch (fallbackError) {
-          console.error('Error with fallback to Alpha Vantage:', fallbackError);
-        }
-      }
-    };
-
-    fetchDailyPrices();
-  }, [selectedTicker]);
 
   const chartData: ChartData<'line'> = {
     labels: [],
