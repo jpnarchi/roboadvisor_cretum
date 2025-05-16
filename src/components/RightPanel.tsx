@@ -301,8 +301,8 @@ const RightPanel: React.FC<RightPanelProps> = ({ selectedCompany, selectedTicker
       return data as EODHDCompanyOverview;
     } catch (error) {
       console.error(`Error fetching company data from EODHD API for ${symbol}:`, error);
-      return null;
-    }
+        return null;
+      }
   };
 
   // Updated function to fetch real-time prices with caching
@@ -444,7 +444,7 @@ const RightPanel: React.FC<RightPanelProps> = ({ selectedCompany, selectedTicker
             throw new Error('Failed to update company data');
           }
           
-          const companyData = await getCompanyData(selectedTicker);
+        const companyData = await getCompanyData(selectedTicker);
           
           const newStockData: StockData = {
             Ticker: selectedTicker,
@@ -461,7 +461,7 @@ const RightPanel: React.FC<RightPanelProps> = ({ selectedCompany, selectedTicker
             recommendation: recommendation.recommendation,
             explanation: recommendation.explanation
           };
-          
+        
           setStockData(newStockData);
         }
       } catch (error) {
@@ -636,7 +636,7 @@ const RightPanel: React.FC<RightPanelProps> = ({ selectedCompany, selectedTicker
                         <span className="text-sm font-medium text-[#b9d6ee]/70 bg-[#b9d6ee]/5 px-2 py-1 rounded border border-[#b9d6ee]/20">
                           {stockData.market}
                         </span>
-                      )}
+                )}
                     </div>
                   )}
                 </div>
@@ -661,7 +661,7 @@ const RightPanel: React.FC<RightPanelProps> = ({ selectedCompany, selectedTicker
                   <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-[#b9d6ee]"></div>
                 </div>
           ) : stockData && (
-            <>
+                <>
               <div className="mt-4 grid grid-cols-4 gap-6 w-full">
                 <div className="glass-panel p-4 rounded-xl border border-[#b9d6ee]/10 bg-gradient-to-br from-[#b9d6ee]/5 to-transparent backdrop-blur-lg shadow-glow">
                   <span className="text-sm uppercase tracking-wider text-[#b9d6ee]/70 font-medium">Price</span>
@@ -781,7 +781,7 @@ const RightPanel: React.FC<RightPanelProps> = ({ selectedCompany, selectedTicker
                         </span>
                           </div>
                       <div className="h-2 bg-yellow-400/10 rounded-full overflow-hidden shadow-glow">
-                        <div 
+                            <div 
                           className="h-full bg-gradient-to-r from-yellow-400 to-yellow-300 rounded-full" 
                           style={{ 
                             width: stockData.eodhd 
@@ -807,7 +807,7 @@ const RightPanel: React.FC<RightPanelProps> = ({ selectedCompany, selectedTicker
                         </span>
                           </div>
                       <div className="h-2 bg-red-400/10 rounded-full overflow-hidden shadow-glow">
-                        <div 
+                            <div 
                           className="h-full bg-gradient-to-r from-red-400 to-red-300 rounded-full" 
                           style={{ 
                             width: stockData.eodhd 

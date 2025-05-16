@@ -95,7 +95,7 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ onCompanySelected, stocks }) 
 
       const data = await response.json();
       console.log('Datos recibidos del webhook:', data);
-      
+
       let streamedContent = '';
       const responseText = Array.isArray(data) && data[0]?.output 
         ? data[0].output 
@@ -115,27 +115,27 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ onCompanySelected, stocks }) 
         // Procesar el contenido actual en busca de patrones
         processMessage(streamedContent);
         
-        setChatMessages(prev => {
-          const newMessages = [...prev];
-          newMessages[newMessages.length - 1] = {
-            role: 'assistant',
-            content: streamedContent,
-            isStreaming: true
-          };
-          return newMessages;
-        });
-      }
+                setChatMessages(prev => {
+                  const newMessages = [...prev];
+                  newMessages[newMessages.length - 1] = {
+                    role: 'assistant',
+                    content: streamedContent,
+                    isStreaming: true
+                  };
+                  return newMessages;
+                });
+              }
 
       // Finalizar el streaming
-      setChatMessages(prev => {
-        const newMessages = [...prev];
-        newMessages[newMessages.length - 1] = {
-          role: 'assistant',
+              setChatMessages(prev => {
+                const newMessages = [...prev];
+                newMessages[newMessages.length - 1] = {
+                  role: 'assistant',
           content: responseText,
-          isStreaming: false
-        };
-        return newMessages;
-      });
+                  isStreaming: false
+                };
+                return newMessages;
+              });
 
     } catch (error) {
       console.error('Error completo:', error);
@@ -153,22 +153,22 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ onCompanySelected, stocks }) 
     const lastMessage = chatMessages[chatMessages.length - 1];
     if (lastMessage?.role === 'assistant') {
       // Look for text between ! marks
-      const matches = lastMessage.content.match(/!([\w\s,.]+)!/);
-      if (matches && matches[1]) {
-        const companyName = matches[1];
-        
-        // Find the ticker for the company
-        const stock = stocks.find(s => s.name === companyName);
-        if (stock) {
-          onCompanySelected(companyName, stock.symbol);
-        } else {
-          // If exact match not found, try to find a partial match
-          const partialMatch = stocks.find(s => 
-            companyName.toLowerCase().includes(s.name.toLowerCase()) || 
-            s.name.toLowerCase().includes(companyName.toLowerCase())
-          );
-          if (partialMatch) {
-            onCompanySelected(companyName, partialMatch.symbol);
+        const matches = lastMessage.content.match(/!([\w\s,.]+)!/);
+        if (matches && matches[1]) {
+          const companyName = matches[1];
+          
+          // Find the ticker for the company
+          const stock = stocks.find(s => s.name === companyName);
+          if (stock) {
+            onCompanySelected(companyName, stock.symbol);
+          } else {
+            // If exact match not found, try to find a partial match
+            const partialMatch = stocks.find(s => 
+              companyName.toLowerCase().includes(s.name.toLowerCase()) || 
+              s.name.toLowerCase().includes(companyName.toLowerCase())
+            );
+            if (partialMatch) {
+              onCompanySelected(companyName, partialMatch.symbol);
           }
         }
       }
@@ -261,9 +261,9 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ onCompanySelected, stocks }) 
                     ),
                   }}
                 >
-                  {message.content}
-                </ReactMarkdown>
-              </div>
+                    {message.content}
+                  </ReactMarkdown>
+                </div>
             </div>
           </div>
         ))}

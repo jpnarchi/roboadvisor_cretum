@@ -113,11 +113,10 @@ function App() {
   const [stocks, setStocks] = useState<StockData[]>(stockTickers);
   const [selectedCompany, setSelectedCompany] = useState<string | null>(null);
   const [selectedTicker, setSelectedTicker] = useState<string | null>(null);
-  const [lastUpdate, setLastUpdate] = useState<string>('No data loaded yet');
+  const [lastUpdate, setLastUpdate] = useState<string>("No data loaded yet");
   const [error, setError] = useState<string | null>(null);
   const [isExporting, setIsExporting] = useState(false);
   const [exportProgress, setExportProgress] = useState(0);
-  const [isLoading, setIsLoading] = useState(false);
 
   // EODHD API Key
   const EODHD_API_KEY = "6824b2d80fe347.44604306";
@@ -165,7 +164,7 @@ function App() {
       // Realizar la solicitud a la API de EODHD
       const response = await fetch(`https://eodhd.com/api/real-time/${formattedSymbol}?api_token=${EODHD_API_KEY}&fmt=json`);
       const data: EODHDResponse = await response.json();
-      
+
       if (!data || !data.code) {
         throw new Error('No se encontraron datos para este ticker');
       }
@@ -320,8 +319,6 @@ function App() {
 
   const handleUpdateData = async () => {
     try {
-      setIsLoading(true);
-      
       // Si hay un ticker seleccionado, actualizar sus datos
       if (selectedTicker) {
         const updatedStockData = await fetchStockData(selectedTicker);
@@ -352,8 +349,6 @@ function App() {
     } catch (error) {
       console.error('Error updating data:', error);
       toast.error('Failed to update data. Please try again later.');
-    } finally {
-      setIsLoading(false);
     }
   };
 

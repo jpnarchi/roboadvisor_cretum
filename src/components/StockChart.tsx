@@ -68,8 +68,8 @@ const StockChart: React.FC<StockChartProps> = ({ symbol }) => {
         const fromDate = startDate.toISOString().split('T')[0];
         const toDate = endDate.toISOString().split('T')[0];
 
-        // Construir la URL de la API
-        const apiUrl = `https://eodhd.com/api/technical/${symbol}.US?order=d&from=${fromDate}&to=${toDate}&function=sma&period=50&api_token=6824b2d80fe347.44604306&fmt=json`;
+        // Construir la URL de la API - IMPORTANTE: Cambiado a order=a (ascendente)
+        const apiUrl = `https://eodhd.com/api/technical/${symbol}.US?order=a&from=${fromDate}&to=${toDate}&function=sma&period=50&api_token=6824b2d80fe347.44604306&fmt=json`;
         
         console.log('Fetching data from:', apiUrl);
         
@@ -79,21 +79,61 @@ const StockChart: React.FC<StockChartProps> = ({ symbol }) => {
         }
         
         const data: SMAData[] = await response.json();
-        console.log('Received data:', data);
+        console.log('Received data length:', data.length);
         
         if (!data || data.length === 0) {
           throw new Error('No data received from API');
         }
         
-        // Ordenar los datos por fecha (más reciente primero)
-        const sortedData = data.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+        // Crear un array con fechas ya parseadas para mejor ordenamiento
+        const dataWithParsedDates = data.map(item => ({
+          ...item,
+          parsedDate: new Date(item.date)
+        }));
+        
+        // IMPORTANTE: Ordenar explícitamente por fecha (de más antiguo a más reciente)
+        // Esto es crucial para asegurar que el ordenamiento sea correcto
+        const sortedData = [...dataWithParsedDates].sort(
+          (a, b) => a.parsedDate.getTime() - b.parsedDate.getTime()
+        );
+        
+        // Imprimir la primera y última fecha para verificar
+        if (sortedData.length > 0) {
+          console.log('First date:', sortedData[0].date);
+          console.log('Last date:', sortedData[sortedData.length - 1].date);
+        }
+        
+        // Formatear fechas para mejor visualización en el gráfico
+        
+        // Detectar y eliminar valores extremos que podrían distorsionar el gráfico
+        const values = sortedData.map(item => item.sma);
+        const mean = values.reduce((sum, val) => sum + val, 0) / values.length;
+        const stdDev = Math.sqrt(
+          values.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / values.length
+        );
+        
+        // Filtrar valores que están a más de 3 desviaciones estándar
+        const threshold = 3 * stdDev;
+        const filteredData = sortedData.filter(
+          item => Math.abs(item.sma - mean) <= threshold
+        );
+        
+        console.log(`Filtered out ${sortedData.length - filteredData.length} outliers`);
+        
+        // IMPORTANTE: Crear un nuevo array de labels que corresponda a los datos filtrados
+        const filteredLabels = filteredData.map(item => {
+          const date = item.parsedDate;
+          return `${date.getMonth() + 1}/${date.getDate()}/${date.getFullYear().toString().substring(2)}`;
+        });
         
         setChartData({
-          labels: sortedData.map(item => item.date),
+          // Usar los labels filtrados
+          labels: filteredLabels,
           datasets: [
             {
               label: 'SMA 50',
-              data: sortedData.map(item => item.sma),
+              // Usar solo los valores de los datos filtrados
+              data: filteredData.map(item => item.sma),
               borderColor: '#b9d6ee',
               backgroundColor: 'rgba(185, 214, 238, 0.1)',
               borderWidth: 2,
@@ -138,7 +178,13 @@ const StockChart: React.FC<StockChartProps> = ({ symbol }) => {
         ticks: {
           color: '#b9d6ee',
           maxRotation: 45,
-          minRotation: 45
+          minRotation: 45,
+          // Mostrar un número limitado de etiquetas para evitar superposición
+          maxTicksLimit: 8,
+          callback: function(tickValue: number | string, index: number): string {
+            // Solo mostrar algunas etiquetas para evitar aglomeración
+            return index % 3 === 0 ? tickValue.toString() : '';
+          }
         }
       },
       y: {
@@ -147,7 +193,9 @@ const StockChart: React.FC<StockChartProps> = ({ symbol }) => {
         },
         ticks: {
           color: '#b9d6ee'
-        }
+        },
+        // Asegurar que la escala comience desde cero
+        beginAtZero: true
       }
     }
   };
