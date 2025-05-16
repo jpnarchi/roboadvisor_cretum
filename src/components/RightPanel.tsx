@@ -4,6 +4,7 @@ import { getAIRecommendation } from '../services/aiService';
 import AIRecommendationPanel from './AIRecommendationPanel';
 import { AIRecommendation } from '../types/AIRecommendation';
 import { Line } from 'react-chartjs-2';
+import html2pdf from 'html2pdf.js';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -152,17 +153,83 @@ interface PortfolioTrendData {
   "Trend Strength": number;
 }
 
+// Add cache at the top of the file, after imports
+const dataCache = new Map<string, {
+  timestamp: number;
+  data: any;
+}>();
 
+const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes in milliseconds
 
 const RightPanel: React.FC<RightPanelProps> = ({ selectedCompany, selectedTicker }) => {
   const [stockData, setStockData] = useState<StockData | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const contentRef = useRef<HTMLDivElement>(null);
 
-  // Updated function to fetch company data from EODHD API
+  const handleExportPDF = async () => {
+    if (!contentRef.current) return;
+
+    const element = contentRef.current;
+    const opt = {
+      margin: 1,
+      filename: `${selectedTicker}_analysis.pdf`,
+      image: { type: 'jpeg', quality: 0.98 },
+      html2canvas: { 
+        scale: 2,
+        useCORS: true,
+        logging: true
+      },
+      jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' }
+    };
+
+    try {
+      // Create a clone of the content to modify for PDF
+      const clone = element.cloneNode(true) as HTMLElement;
+      
+      // Remove the export button from the clone
+      const exportButton = clone.querySelector('.export-button');
+      if (exportButton) {
+        exportButton.remove();
+      }
+
+      // Add some PDF-specific styling
+      const style = document.createElement('style');
+      style.textContent = `
+        .glass-panel {
+          background: white !important;
+          box-shadow: none !important;
+        }
+        * {
+          color: black !important;
+        }
+        .text-[#b9d6ee] {
+          color: #2c3e50 !important;
+        }
+        .text-[#b9d6ee]/70 {
+          color: #34495e !important;
+        }
+        .text-[#b9d6ee]/60 {
+          color: #7f8c8d !important;
+        }
+        .bg-gradient-to-br {
+          background: white !important;
+        }
+        .border-[#b9d6ee] {
+          border-color: #bdc3c7 !important;
+        }
+      `;
+      clone.appendChild(style);
+
+      // Generate PDF
+      await html2pdf().set(opt).from(clone).save();
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+    }
+  };
+
+  // Updated function to fetch company data from EODHD API with caching
   const fetchCompanyDataFromEODHD = async (symbol: string): Promise<EODHDCompanyOverview | null> => {
     try {
-      // Clean up the ticker symbol by removing market extensions if needed
       const cleanSymbol = symbol.includes('.') 
         ? `${symbol.split('.')[0]}.${symbol.split('.')[1] === 'BMV' ? 'MX' : 
            symbol.split('.')[1] === 'DEX' ? 'DE' : 
@@ -170,11 +237,18 @@ const RightPanel: React.FC<RightPanelProps> = ({ selectedCompany, selectedTicker
            symbol.split('.')[1] === 'MIL' ? 'IT' : 'US'}`
         : `${symbol}.US`;
 
+      // Check cache first
+      const cacheKey = `company_${cleanSymbol}`;
+      const cachedData = dataCache.get(cacheKey);
+      if (cachedData && Date.now() - cachedData.timestamp < CACHE_DURATION) {
+        console.log('Using cached company data for:', cleanSymbol);
+        return cachedData.data;
+      }
+
       console.log(`Fetching company data from EODHD API for ${cleanSymbol}...`);
       
-      const apiToken = "6824b2d80fe347.44604306"; // Your EODHD API token
+      const apiToken = "6824b2d80fe347.44604306";
       const filters = [
-      
         "General::Code",
         "General::Sector",
         "Highlights::MarketCapitalization",
@@ -203,17 +277,58 @@ const RightPanel: React.FC<RightPanelProps> = ({ selectedCompany, selectedTicker
       }
       
       const data = await response.json();
-      console.log(`EODHD API response for ${cleanSymbol}:`, data);
       
-      // Check if the response has the expected data
-      if (!data["General::Code"]) {
-        console.error(`No valid data for ${cleanSymbol}`);
-        return null;
-      }
+      // Cache the data
+      dataCache.set(cacheKey, {
+        timestamp: Date.now(),
+        data
+      });
       
       return data as EODHDCompanyOverview;
     } catch (error) {
       console.error(`Error fetching company data from EODHD API for ${symbol}:`, error);
+      return null;
+    }
+  };
+
+  // Updated function to fetch real-time prices with caching
+  const fetchDailyPrices = async (ticker: string): Promise<{ close: number } | null> => {
+    try {
+      const cleanSymbol = ticker.includes('.') 
+        ? `${ticker.split('.')[0]}.${ticker.split('.')[1] === 'BMV' ? 'MX' : 
+           ticker.split('.')[1] === 'DEX' ? 'DE' : 
+           ticker.split('.')[1] === 'LON' ? 'GB' : 
+           ticker.split('.')[1] === 'MIL' ? 'IT' : 'US'}`
+        : `${ticker}.US`;
+          
+      // Check cache first
+      const cacheKey = `price_${cleanSymbol}`;
+      const cachedData = dataCache.get(cacheKey);
+      if (cachedData && Date.now() - cachedData.timestamp < 60000) { // 1 minute cache for prices
+        console.log('Using cached price data for:', cleanSymbol);
+        return cachedData.data;
+      }
+
+      const apiToken = "6824b2d80fe347.44604306";
+      const response = await fetch(
+        `https://eodhd.com/api/real-time/${cleanSymbol}?api_token=${apiToken}&fmt=json`
+      );
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      
+      // Cache the data
+      dataCache.set(cacheKey, {
+        timestamp: Date.now(),
+        data: { close: data.close }
+      });
+      
+      return { close: data.close };
+    } catch (error) {
+      console.error('Error fetching real-time prices:', error);
       return null;
     }
   };
@@ -225,27 +340,23 @@ const RightPanel: React.FC<RightPanelProps> = ({ selectedCompany, selectedTicker
       try {
         setIsLoading(true);
         
-        // Fetch AI recommendation first
-        console.log('Fetching AI recommendation for:', selectedTicker);
-        const recommendation = await getAIRecommendation(selectedTicker);
-        console.log('Received AI recommendation:', recommendation);
-        
-        // Fetch data from EODHD API
-        const eodhdData = await fetchCompanyDataFromEODHD(selectedTicker);
-        
-        // Fetch daily price data first to ensure we have a price
-        const priceData = await fetchDailyPrices(selectedTicker);
+        // Fetch all data in parallel
+        const [recommendation, eodhdData, priceData] = await Promise.all([
+          getAIRecommendation(selectedTicker),
+          fetchCompanyDataFromEODHD(selectedTicker),
+          fetchDailyPrices(selectedTicker)
+        ]);
+
         const currentPrice = priceData?.close || 0;
         
         if (eodhdData) {
-          // Create the stockData object with EODHD data
           const newStockData: StockData = {
             Ticker: selectedTicker,
             "Market Capitalization": eodhdData["Highlights::MarketCapitalization"],
             Sector: eodhdData["General::Sector"] || "N/A",
             Rating: eodhdData["AnalystRatings::Rating"] || "N/A",
             "Rated On": "Not rated",
-            Price: currentPrice, // Use the fetched price
+            Price: currentPrice,
             eodhd: eodhdData,
             market: selectedTicker.includes('.BMV') ? 'Mexico' :
                     selectedTicker.includes('.DEX') ? 'XETRA' :
@@ -258,23 +369,20 @@ const RightPanel: React.FC<RightPanelProps> = ({ selectedCompany, selectedTicker
           setStockData(newStockData);
         } else {
           // Fallback to the old method if EODHD fails
-          // Update company data
           const updateSuccess = await updateCompanyData(selectedTicker);
           if (!updateSuccess) {
             throw new Error('Failed to update company data');
           }
           
-          // Get company data
           const companyData = await getCompanyData(selectedTicker);
           
-          // Create the stockData object with the company data
           const newStockData: StockData = {
             Ticker: selectedTicker,
             "Market Capitalization": companyData.MarketCapitalization || "N/A",
             Sector: companyData.Sector || "N/A",
             Rating: "N/A",
             "Rated On": "Not rated",
-            Price: currentPrice || companyData["50DayMovingAverage"] || "N/A", // Use fetched price or fallback
+            Price: currentPrice || companyData["50DayMovingAverage"] || "N/A",
             overview: companyData,
             market: selectedTicker.includes('.BMV') ? 'Mexico' :
                     selectedTicker.includes('.DEX') ? 'XETRA' :
@@ -288,8 +396,6 @@ const RightPanel: React.FC<RightPanelProps> = ({ selectedCompany, selectedTicker
         }
       } catch (error) {
         console.error('Error fetching data:', error);
-        // Don't set stockData to null, keep previous data
-        setIsLoading(false);
       } finally {
         setIsLoading(false);
       }
@@ -298,45 +404,10 @@ const RightPanel: React.FC<RightPanelProps> = ({ selectedCompany, selectedTicker
     fetchData();
   }, [selectedTicker]);
 
-  // Separate function to fetch daily prices
-  const fetchDailyPrices = async (ticker: string): Promise<{ close: number } | null> => {
-    try {
-      // Clean up the ticker symbol
-      const cleanSymbol = ticker.includes('.') 
-        ? `${ticker.split('.')[0]}.${ticker.split('.')[1] === 'BMV' ? 'MX' : 
-           ticker.split('.')[1] === 'DEX' ? 'DE' : 
-           ticker.split('.')[1] === 'LON' ? 'GB' : 
-           ticker.split('.')[1] === 'MIL' ? 'IT' : 'US'}`
-        : `${ticker}.US`;
-          
-      const apiToken = "6824b2d80fe347.44604306";
-      const response = await fetch(
-        `https://eodhd.com/api/fundamentals/${cleanSymbol}?filter=General::Code,General::Sector,Highlights::MarketCapitalization,Valuation::TrailingPE,Valuation::PriceBookMRQ,SplitsDividends::ForwardAnnualDividendYield,Technicals::Beta,Highlights::ReturnOnAssetsTTM,Highlights::ReturnOnEquityTTM,AnalystRatings::TargetPrice,SplitsDividends::ExDividendDate,AnalystRatings::Rating,AnalystRatings::StrongBuy,AnalystRatings::Buy,AnalystRatings::Hold,AnalystRatings::Sell,AnalystRatings::StrongSell&api_token=${apiToken}&fmt=json`
-      );
-      
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      
-      const data = await response.json();
-      
-      if (Array.isArray(data) && data.length > 0) {
-        return { close: data[0].close };
-      }
-      
-      return null;
-    } catch (error) {
-      console.error('Error fetching daily prices:', error);
-      return null;
-    }
-  };
-
+  // Update portfolio trend less frequently
   useEffect(() => {
     const fetchPortfolioTrend = async () => {
       if (!selectedTicker) return;
-      
-      // Don't reset stockData when ticker changes
-      console.log('Fetching portfolio trend for:', selectedTicker);
       
       try {
         const response = await fetch('/portfolio_trend.json');
@@ -345,24 +416,12 @@ const RightPanel: React.FC<RightPanelProps> = ({ selectedCompany, selectedTicker
         }
 
         const text = await response.text();
-        console.log('Raw response:', text.substring(0, 200) + '...');
-        
-        let data;
-        try {
-          // Remove any BOM characters and trim whitespace
-          const cleanText = text.replace(/^\uFEFF/, '').trim();
-          // Replace NaN with null in the JSON string
-          const sanitizedText = cleanText.replace(/: NaN/g, ': null');
-          data = JSON.parse(sanitizedText);
-        } catch (parseError) {
-          console.error('Error parsing JSON:', parseError);
-          throw new Error('Invalid JSON format');
-        }
+        const cleanText = text.replace(/^\uFEFF/, '').trim();
+        const sanitizedText = cleanText.replace(/: NaN/g, ': null');
+        const data = JSON.parse(sanitizedText);
 
-        // Find the stock trend
         const stockTrend = data.find((item: any) => item.Ticker === selectedTicker);
         if (stockTrend) {
-          // Create a new object with the correct types and ensure Rating is uppercase
           const typedStockTrend: PortfolioTrendData = {
             Weight: String(stockTrend.Weight || "0.00%"),
             Ticker: String(stockTrend.Ticker),
@@ -379,69 +438,22 @@ const RightPanel: React.FC<RightPanelProps> = ({ selectedCompany, selectedTicker
             "Trend Strength": Number(stockTrend["Trend Strength"] || 0)
           };
           
-          console.log('Found stock trend:', typedStockTrend);
           setStockData(prevData => ({
             ...typedStockTrend,
-            recommendation: prevData?.recommendation,
-            explanation: prevData?.explanation
-          }));
-        } else {
-          console.log('No stock trend found for:', selectedTicker);
-          // Set default trend if no data found
-          const defaultTrend: PortfolioTrendData = {
-            Weight: "0.00%",
-            Ticker: selectedTicker,
-            Name: selectedCompany || "",
-            Price: "N/A",
-            Currency: "USD",
-            "Market Capitalization": "N/A",
-            Sector: "N/A",
-            Rating: "N/A",
-            "Rated On": new Date().toISOString().split('T')[0],
-            "Since Rated": "0%",
-            "Smart Momentum": 0,
-            Retracement: "0%",
-            "Trend Strength": 0
-          };
-          setStockData(prevData => ({
-            ...defaultTrend,
             recommendation: prevData?.recommendation,
             explanation: prevData?.explanation
           }));
         }
       } catch (error) {
         console.error('Error processing portfolio trend:', error);
-        // Set default trend on error
-        const defaultTrend: PortfolioTrendData = {
-          Weight: "0.00%",
-          Ticker: selectedTicker,
-          Name: selectedCompany || "",
-          Price: "N/A",
-          Currency: "USD",
-          "Market Capitalization": "N/A",
-          Sector: "N/A",
-          Rating: "N/A",
-          "Rated On": new Date().toISOString().split('T')[0],
-          "Since Rated": "0%",
-          "Smart Momentum": 0,
-          Retracement: "0%",
-          "Trend Strength": 0
-        };
-        setStockData(prevData => ({
-          ...defaultTrend,
-          recommendation: prevData?.recommendation,
-          explanation: prevData?.explanation
-        }));
       }
     };
 
-    // Execute immediately when ticker changes
     fetchPortfolioTrend();
     
-    // Set up interval for updates
-    const intervalId = setInterval(fetchPortfolioTrend, 30000);
+    // Update portfolio trend every 5 minutes instead of 30 seconds
+    const intervalId = setInterval(fetchPortfolioTrend, 5 * 60 * 1000);
 
-    // Clean up interval
     return () => clearInterval(intervalId);
   }, [selectedTicker, selectedCompany]);
 
@@ -573,6 +585,15 @@ const RightPanel: React.FC<RightPanelProps> = ({ selectedCompany, selectedTicker
                     </div>
                   )}
                 </div>
+                <button
+                  onClick={handleExportPDF}
+                  className="export-button flex items-center gap-2 px-4 py-2 bg-[#b9d6ee]/10 hover:bg-[#b9d6ee]/20 text-[#b9d6ee] rounded-lg border border-[#b9d6ee]/20 transition-all duration-200 shadow-glow"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clipRule="evenodd" />
+                  </svg>
+                  Export PDF
+                </button>
               </div>
               <p className="text-[#b9d6ee]/60 text-sm">
                 {stockData?.eodhd ? stockData.eodhd["General::Sector"] : (stockData?.overview?.Sector || 'Sector not available')}

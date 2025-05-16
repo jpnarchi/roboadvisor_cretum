@@ -42,7 +42,7 @@ const stockTickers: StockData[] = [
   { symbol: 'AMZN', name: 'Amazon.com Inc.', market: 'US' },
   { symbol: 'GOOGL', name: 'Alphabet Inc.', market: 'US' },
   { symbol: 'META', name: 'Meta Platforms Inc.', market: 'US' },
-  { symbol: 'BRK.B', name: 'Berkshire Hathaway Inc.', market: 'US' },
+  { symbol: 'BRKB.BA', name: 'Berkshire Hathaway Inc.', market: 'US' },
   { symbol: 'SPY', name: 'SPDR S&P 500 ETF Trust', market: 'US' },
   { symbol: 'TCEHY', name: 'Tencent Holdings Ltd.', market: 'US' },
   { symbol: 'BABA', name: 'Alibaba Group Holding Ltd.', market: 'US' },
@@ -73,11 +73,11 @@ const stockTickers: StockData[] = [
   { symbol: 'SAP.XETRA', name: 'SAP SE', market: 'XETRA' },
   
   // UK Stocks (London Stock Exchange)
-  { symbol: 'TSCO.LON', name: 'Tesco PLC', market: 'LSE' },
-  { symbol: 'BT.A.LON', name: 'BT Group plc', market: 'LSE' },
-  { symbol: 'HSBA.LON', name: 'HSBC Holdings plc', market: 'LSE' },
-  { symbol: 'BP.LON', name: 'BP p.l.c.', market: 'LSE' },
-  { symbol: 'VOD.LON', name: 'Vodafone Group Plc', market: 'LSE' },
+  // { symbol: 'TSCO.LON', name: 'Tesco PLC', market: 'LSE' },
+  { symbol: 'BT-A.LON', name: 'BT Group plc', market: 'LSE' },
+  { symbol: 'HSBA.LSE', name: 'HSBC Holdings plc', market: 'LSE' },
+  { symbol: 'BP.LSE', name: 'BP p.l.c.', market: 'LSE' },
+  { symbol: 'VOD.LSE', name: 'Vodafone Group Plc', market: 'LSE' },
   
   // Canadian Stocks (Toronto Stock Exchange)
   { symbol: 'SHOP.TRT', name: 'Shopify Inc.', market: 'TSX' },
@@ -89,22 +89,22 @@ const stockTickers: StockData[] = [
   { symbol: 'GPV.TRV', name: 'GreenPower Motor Company Inc.', market: 'TSXV' },
   
   // Indian Stocks (BSE)
-  { symbol: 'RELIANCE.BSE', name: 'Reliance Industries Limited', market: 'BSE' },
-  { symbol: 'TCS.BSE', name: 'Tata Consultancy Services Limited', market: 'BSE' },
-  { symbol: 'HDFCBANK.BSE', name: 'HDFC Bank Limited', market: 'BSE' },
-  { symbol: 'INFY.BSE', name: 'Infosys Limited', market: 'BSE' },
+  { symbol: 'RELIANCE.NSE', name: 'Reliance Industries Limited', market: 'BSE' },
+  { symbol: 'TCS.NSE', name: 'Tata Consultancy Services Limited', market: 'BSE' },
+  { symbol: 'HDFCBANK.NSE', name: 'HDFC Bank Limited', market: 'BSE' },
+  { symbol: 'INFY.NSE', name: 'Infosys Limited', market: 'BSE' },
   
   // Chinese Stocks (Shanghai Stock Exchange)
-  { symbol: '600104.SHH', name: 'SAIC Motor Corporation Limited', market: 'SSE' },
-  { symbol: '601318.SHH', name: 'Ping An Insurance (Group) Company of China, Ltd.', market: 'SSE' },
-  { symbol: '600519.SHH', name: 'Kweichow Moutai Co., Ltd.', market: 'SSE' },
+  { symbol: '600104.SHG', name: 'SAIC Motor Corporation Limited', market: 'SSE' },
+  { symbol: '601318.SHG', name: 'Ping An Insurance (Group) Company of China, Ltd.', market: 'SSE' },
+  { symbol: '600519.SHG', name: 'Kweichow Moutai Co., Ltd.', market: 'SSE' },
   
   // Chinese Stocks (Shenzhen Stock Exchange)
-  { symbol: '000002.SHZ', name: 'China Vanke Co., Ltd.', market: 'SZSE' },
-  { symbol: '000651.SHZ', name: 'Gree Electric Appliances Inc. of Zhuhai', market: 'SZSE' },
-  { symbol: '000333.SHZ', name: 'Midea Group Co., Ltd.', market: 'SZSE' },
+  { symbol: '000002.SHE', name: 'China Vanke Co., Ltd.', market: 'SZSE' },
+  { symbol: '000651.SHE', name: 'Gree Electric Appliances Inc. of Zhuhai', market: 'SZSE' },
+  { symbol: '000333.SHE', name: 'Midea Group Co., Ltd.', market: 'SZSE' },
 
-  { symbol: 'FEMSAUBD', name: 'Grupo Femsa', market: 'MX' }
+  { symbol: 'FEMSAUB.MX', name: 'Grupo Femsa', market: 'MX' }
 ];
 
 function App() {
@@ -143,7 +143,7 @@ function App() {
       case 'SSE':
         return symbol.replace('.SHH', '.SS');
       case 'SZSE':
-        return symbol.replace('.SHZ', '.SZ');
+        return symbol.replace('.SHG', '.SZ');
       case 'MX':
         return symbol.replace('.MX', '.MX');
       default:

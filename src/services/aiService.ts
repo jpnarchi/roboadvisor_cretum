@@ -104,7 +104,14 @@ Proporciona para cada acción:
 2. Tipo de acción: VALOR/CRECIMIENTO
 3. Principales métricas que justifican la decisión
 4. Potencial de retorno estimado (%)
-5. Nivel de confianza en la recomendación (Alto/Medio/Bajo)`;
+5. Nivel de confianza en la recomendación (Alto/Medio/Bajo)
+
+IMPORTANTE:
+TU RESPUESTA DEBE DER MUY CORTA Y CONCISA, MENOS DE 4 ORACIONES.
+
+
+
+`;
 
 export const getAIRecommendation = async (ticker: string): Promise<AIResponse> => {
   try {
