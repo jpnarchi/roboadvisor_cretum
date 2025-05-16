@@ -165,6 +165,20 @@ const RightPanel: React.FC<RightPanelProps> = ({ selectedCompany, selectedTicker
   const [stockData, setStockData] = useState<StockData | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const contentRef = useRef<HTMLDivElement>(null);
+  const [chartData, setChartData] = useState<ChartData<'line'>>({
+    labels: [],
+    datasets: [
+      {
+        label: 'Close Price',
+        data: [],
+        borderColor: '#b9d6ee',
+        backgroundColor: 'rgba(185, 214, 238, 0.1)',
+        borderWidth: 2,
+        fill: true,
+        tension: 0.4
+      }
+    ]
+  });
 
   const handleExportPDF = async () => {
     if (!contentRef.current) return;
@@ -333,6 +347,59 @@ const RightPanel: React.FC<RightPanelProps> = ({ selectedCompany, selectedTicker
     }
   };
 
+  // Add new function to fetch daily prices
+  const fetchDailyPriceData = async (symbol: string) => {
+    try {
+      const cleanSymbol = symbol.includes('.') 
+        ? `${symbol.split('.')[0]}.${symbol.split('.')[1] === 'BMV' ? 'MX' : 
+           symbol.split('.')[1] === 'DEX' ? 'DE' : 
+           symbol.split('.')[1] === 'LON' ? 'GB' : 
+           symbol.split('.')[1] === 'MIL' ? 'IT' : 'US'}`
+        : `${symbol}.US`;
+
+      // Get dates for last 3 years
+      const endDate = new Date();
+      const startDate = new Date();
+      startDate.setFullYear(startDate.getFullYear() - 3);
+
+      const fromDate = startDate.toISOString().split('T')[0];
+      const toDate = endDate.toISOString().split('T')[0];
+
+      const apiToken = "6824b2d80fe347.44604306";
+      const response = await fetch(
+        `https://eodhd.com/api/eod/${cleanSymbol}?from=${fromDate}&to=${toDate}&api_token=${apiToken}&fmt=json`
+      );
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      
+      // Sort data by date (newest first)
+      const sortedData = data.sort((a: any, b: any) => 
+        new Date(b.date).getTime() - new Date(a.date).getTime()
+      );
+
+      setChartData({
+        labels: sortedData.map((item: any) => item.date),
+        datasets: [
+          {
+            label: 'Close Price',
+            data: sortedData.map((item: any) => item.close),
+            borderColor: '#b9d6ee',
+            backgroundColor: 'rgba(185, 214, 238, 0.1)',
+            borderWidth: 2,
+            fill: true,
+            tension: 0.4
+          }
+        ]
+      });
+    } catch (error) {
+      console.error('Error fetching daily price data:', error);
+    }
+  };
+
   useEffect(() => {
     const fetchData = async () => {
       if (!selectedTicker) return;
@@ -346,6 +413,9 @@ const RightPanel: React.FC<RightPanelProps> = ({ selectedCompany, selectedTicker
           fetchCompanyDataFromEODHD(selectedTicker),
           fetchDailyPrices(selectedTicker)
         ]);
+
+        // Fetch daily price data for the chart
+        await fetchDailyPriceData(selectedTicker);
 
         const currentPrice = priceData?.close || 0;
         
@@ -456,21 +526,6 @@ const RightPanel: React.FC<RightPanelProps> = ({ selectedCompany, selectedTicker
 
     return () => clearInterval(intervalId);
   }, [selectedTicker, selectedCompany]);
-
-  const chartData: ChartData<'line'> = {
-    labels: [],
-    datasets: [
-      {
-        label: 'Close Price',
-        data: [],
-        borderColor: '#b9d6ee',
-        backgroundColor: 'rgba(185, 214, 238, 0.1)',
-        borderWidth: 2,
-        fill: true,
-        tension: 0.4
-      }
-    ]
-  };
 
   const chartOptions = {
     responsive: true,
