@@ -113,10 +113,11 @@ function App() {
   const [stocks, setStocks] = useState<StockData[]>(stockTickers);
   const [selectedCompany, setSelectedCompany] = useState<string | null>(null);
   const [selectedTicker, setSelectedTicker] = useState<string | null>(null);
-  const [lastUpdate, setLastUpdate] = useState<string>('');
+  const [lastUpdate, setLastUpdate] = useState<string>('No data loaded yet');
   const [error, setError] = useState<string | null>(null);
   const [isExporting, setIsExporting] = useState(false);
   const [exportProgress, setExportProgress] = useState(0);
+  const [isLoading, setIsLoading] = useState(false);
 
   // EODHD API Key
   const EODHD_API_KEY = "6824b2d80fe347.44604306";
@@ -169,6 +170,9 @@ function App() {
         throw new Error('No se encontraron datos para este ticker');
       }
 
+      // Actualizar el timestamp después de que la solicitud se complete exitosamente
+      setLastUpdate(formatDateTime());
+
       // Nos aseguramos de que price y change sean números válidos
       const price = typeof data.close === 'number' && !isNaN(data.close) ? data.close : undefined;
       const change = typeof data.change_p === 'number' && !isNaN(data.change_p) ? data.change_p : undefined;
@@ -177,8 +181,8 @@ function App() {
         symbol: stock.symbol,
         name: stock.name,
         market: stock.market,
-        price,  // Nos aseguramos de que sea un número o undefined
-        change, // Nos aseguramos de que sea un número o undefined
+        price,
+        change,
         loading: false
       } as StockData;
     } catch (error) {
@@ -276,21 +280,29 @@ function App() {
   const fetchLastUpdate = async () => {
     try {
       const time = await getLastUpdateTime();
-      setLastUpdate(time);
+      if (time) {
+        setLastUpdate(new Date(time).toLocaleString());
+      } else {
+        setLastUpdate(new Date().toLocaleString());
+      }
     } catch (error) {
       console.error('Error fetching last update time:', error);
+      setLastUpdate(new Date().toLocaleString());
     }
   };
 
-  const handleUpdateData = async () => {
-    try {
-      await updateData();
-      const newLastUpdate = await getLastUpdateTime();
-      setLastUpdate(newLastUpdate);
-      toast.success('Data updated successfully!');
-    } catch (error) {
-      toast.error('Failed to update data. Please try again later.');
-    }
+  // Función para formatear la fecha sin segundos
+  const formatDateTime = () => {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    const hours = now.getHours();
+    const minutes = String(now.getMinutes()).padStart(2, '0');
+    const ampm = hours >= 12 ? 'PM' : 'AM';
+    const formattedHours = hours % 12 || 12;
+    
+    return `${month}/${day}/${year} ${formattedHours}:${minutes} ${ampm}`;
   };
 
   const handleStockClick = async (symbol: string) => {
@@ -304,6 +316,45 @@ function App() {
   const handleCompanySelected = (company: string, ticker: string) => {
     setSelectedCompany(company);
     setSelectedTicker(ticker);
+  };
+
+  const handleUpdateData = async () => {
+    try {
+      setIsLoading(true);
+      
+      // Si hay un ticker seleccionado, actualizar sus datos
+      if (selectedTicker) {
+        const updatedStockData = await fetchStockData(selectedTicker);
+        setStocks(prevStocks => 
+          prevStocks.map(stock => 
+            stock.symbol === selectedTicker ? updatedStockData : stock
+          )
+        );
+      }
+
+      // Actualizar todos los datos
+      await updateData();
+      
+      // Actualizar la lista completa de stocks
+      const updatedStocks = await Promise.all(
+        stockTickers.map(async (stock) => {
+          try {
+            return await fetchStockData(stock.symbol);
+          } catch (error) {
+            console.error(`Error updating ${stock.symbol}:`, error);
+            return stock;
+          }
+        })
+      );
+
+      setStocks(updatedStocks);
+      toast.success('Data updated successfully!');
+    } catch (error) {
+      console.error('Error updating data:', error);
+      toast.error('Failed to update data. Please try again later.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const exportStockData = async () => {
@@ -405,11 +456,9 @@ function App() {
               </div>
             </div>
             <div className="flex items-center gap-4">
-              {lastUpdate && (
-                <span className="text-sm text-[#b9d6ee]/70">
-                  Last updated: {new Date(lastUpdate).toLocaleString()}
-                </span>
-              )}
+              <span className="text-sm text-[#b9d6ee]/70">
+                Last chart update: {lastUpdate}
+              </span>
               <button
                 onClick={() => handleUpdateData()}
                 className="p-2 rounded-full hover:bg-white/10 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#b9d6ee] text-[#b9d6ee]"
