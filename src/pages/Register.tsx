@@ -67,7 +67,7 @@ const Register: React.FC = () => {
       }
 
       // Verificar que el usuario existe en auth.users antes de crear el perfil
-      const { data: userCheck, error: userCheckError } = await supabase
+      const { error: userCheckError } = await supabase
         .from('users')
         .select('id')
         .eq('id', authData.user.id)
