@@ -38,39 +38,60 @@ const Register: React.FC = () => {
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email,
         password,
+        options: {
+          data: {
+            full_name: fullName,
+            invitation_code: invitationCode
+          }
+        }
       });
 
       if (authError) throw authError;
 
-      if (authData.user) {
-        // Obtener el ID del rol de usuario
-        const { data: roleData, error: roleError } = await supabase
-          .from('user_roles')
-          .select('id')
-          .eq('name', 'user')
-          .single();
-
-        if (roleError || !roleData) {
-          throw new Error('Error al obtener el rol de usuario');
-        }
-
-        // Crear el perfil del usuario
-        const { error: profileError } = await supabase
-          .from('users')
-          .insert([
-            {
-              id: authData.user.id,
-              email,
-              full_name: fullName,
-              role_id: roleData.id,
-              invitation_code: invitationCode
-            },
-          ]);
-
-        if (profileError) throw profileError;
-
-        navigate('/dashboard');
+      if (!authData.user) {
+        throw new Error('Error al crear el usuario');
       }
+
+      // Obtener el ID del rol de usuario
+      const { data: roleData, error: roleError } = await supabase
+        .from('user_roles')
+        .select('id')
+        .eq('name', 'user')
+        .single();
+
+      if (roleError || !roleData) {
+        throw new Error('Error al obtener el rol de usuario');
+      }
+
+      // Crear el perfil del usuario
+      const { error: profileError } = await supabase
+        .from('users')
+        .insert([
+          {
+            id: authData.user.id,
+            email,
+            full_name: fullName,
+            role_id: roleData.id,
+            invitation_code: invitationCode
+          },
+        ]);
+
+      if (profileError) {
+        console.error('Error al crear el perfil:', profileError);
+        throw new Error('Error al crear el perfil de usuario');
+      }
+
+      // Actualizar el contador de uso del código de invitación
+      const { error: updateError } = await supabase
+        .from('invitation_codes')
+        .update({ usage_count: invitationData.usage_count + 1 })
+        .eq('code', invitationCode);
+
+      if (updateError) {
+        console.error('Error al actualizar el código de invitación:', updateError);
+      }
+
+      navigate('/dashboard');
     } catch (error: any) {
       setError(error.message);
     } finally {
