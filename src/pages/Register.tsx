@@ -52,6 +52,9 @@ const Register: React.FC = () => {
         throw new Error('Error al crear el usuario');
       }
 
+      // Esperar un momento para asegurar que el usuario se cree en auth.users
+      await new Promise(resolve => setTimeout(resolve, 1000));
+
       // Obtener el ID del rol de usuario
       const { data: roleData, error: roleError } = await supabase
         .from('user_roles')
@@ -61,6 +64,17 @@ const Register: React.FC = () => {
 
       if (roleError || !roleData) {
         throw new Error('Error al obtener el rol de usuario');
+      }
+
+      // Verificar que el usuario existe en auth.users antes de crear el perfil
+      const { data: userCheck, error: userCheckError } = await supabase
+        .from('users')
+        .select('id')
+        .eq('id', authData.user.id)
+        .single();
+
+      if (userCheckError && userCheckError.code !== 'PGRST116') {
+        throw new Error('Error al verificar el usuario');
       }
 
       // Crear el perfil del usuario
