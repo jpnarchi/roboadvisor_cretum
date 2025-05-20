@@ -3,7 +3,7 @@ import { getCompanyData, updateCompanyData } from '../services/companyService';
 import { getAIRecommendation } from '../services/aiService';
 import AIRecommendationPanel from './AIRecommendationPanel';
 import { AIRecommendation } from '../types/AIRecommendation';
-import { Line } from 'react-chartjs-2';
+import StockChart from './StockChart';
 import html2pdf from 'html2pdf.js';
 import {
   Chart as ChartJS,
@@ -13,8 +13,7 @@ import {
   LineElement,
   Title,
   Tooltip,
-  Legend,
-  ChartData
+  Legend
 } from 'chart.js';
 
 // Registrar los componentes necesarios de Chart.js
@@ -164,80 +163,87 @@ const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes in milliseconds
 const RightPanel: React.FC<RightPanelProps> = ({ selectedCompany, selectedTicker }) => {
   const [stockData, setStockData] = useState<StockData | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
   const contentRef = useRef<HTMLDivElement>(null);
-  const [chartData, setChartData] = useState<ChartData<'line'>>({
-    labels: [],
-    datasets: [
-      {
-        label: 'Close Price',
-        data: [],
-        borderColor: '#b9d6ee',
-        backgroundColor: 'rgba(185, 214, 238, 0.1)',
-        borderWidth: 2,
-        fill: true,
-        tension: 0.4
-      }
-    ]
-  });
 
   const handleExportPDF = async () => {
     if (!contentRef.current) return;
 
-    const element = contentRef.current;
-    const opt = {
-      margin: 1,
-      filename: `${selectedTicker}_analysis.pdf`,
-      image: { type: 'jpeg', quality: 0.98 },
-      html2canvas: { 
-        scale: 2,
-        useCORS: true,
-        logging: true
-      },
-      jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' }
-    };
+    setIsExporting(true);
 
     try {
-      // Create a clone of the content to modify for PDF
-      const clone = element.cloneNode(true) as HTMLElement;
+      const element = contentRef.current;
       
-      // Remove the export button from the clone
-      const exportButton = clone.querySelector('.export-button');
-      if (exportButton) {
-        exportButton.remove();
-      }
+      // Configuración básica para html2pdf
+      const opt = {
+        margin: 0.5,
+        filename: `${selectedTicker}_analysis.pdf`,
+        image: { type: 'jpeg', quality: 1 },
+        html2canvas: { 
+          scale: 2,
+          useCORS: true,
+          logging: false,
+          backgroundColor: '#ffffff',
+          windowWidth: element.scrollWidth,
+          windowHeight: element.scrollHeight,
+          onclone: (clonedDoc: Document) => {
+            // Aplicar estilos al documento clonado
+            const style = clonedDoc.createElement('style');
+            style.textContent = `
+              * {
+                -webkit-print-color-adjust: exact !important;
+                color-adjust: exact !important;
+              }
+              .glass-panel {
+                background: white !important;
+                box-shadow: none !important;
+              }
+              .bg-black, .bg-black\\/40, .bg-black\\/50, .bg-black\\/80 {
+                background: white !important;
+              }
+              .from-black\\/40, .to-\\[\\#b9d6ee\\]\\/5 {
+                background: white !important;
+              }
+              .backdrop-blur-xl {
+                backdrop-filter: none !important;
+              }
+              canvas {
+                max-width: 100% !important;
+                height: auto !important;
+              }
+            `;
+            clonedDoc.head.appendChild(style);
 
-      // Add some PDF-specific styling
-      const style = document.createElement('style');
-      style.textContent = `
-        .glass-panel {
-          background: white !important;
-          box-shadow: none !important;
-        }
-        * {
-          color: black !important;
-        }
-        .text-[#b9d6ee] {
-          color: #2c3e50 !important;
-        }
-        .text-[#b9d6ee]/70 {
-          color: #34495e !important;
-        }
-        .text-[#b9d6ee]/60 {
-          color: #7f8c8d !important;
-        }
-        .bg-gradient-to-br {
-          background: white !important;
-        }
-        .border-[#b9d6ee] {
-          border-color: #bdc3c7 !important;
-        }
-      `;
-      clone.appendChild(style);
+            // Eliminar elementos innecesarios
+            const elementsToRemove = clonedDoc.querySelectorAll('.export-button, .fixed');
+            elementsToRemove.forEach((el: Element) => el.remove());
 
-      // Generate PDF
-      await html2pdf().set(opt).from(clone).save();
+            // Asegurarse de que los canvases estén renderizados
+            const canvases = clonedDoc.getElementsByTagName('canvas');
+            Array.from(canvases).forEach((canvas: HTMLCanvasElement) => {
+              canvas.style.width = '100%';
+              canvas.style.height = 'auto';
+            });
+          }
+        },
+        jsPDF: { 
+          unit: 'in', 
+          format: 'a4', 
+          orientation: 'portrait',
+          compress: true
+        }
+      };
+
+      // Esperar a que los canvases se rendericen
+      await new Promise(resolve => setTimeout(resolve, 2000));
+
+      // Generar PDF
+      await html2pdf().set(opt).from(element).save();
+
     } catch (error) {
       console.error('Error generating PDF:', error);
+    } finally {
+      setIsExporting(false);
     }
   };
 
@@ -381,20 +387,36 @@ const RightPanel: React.FC<RightPanelProps> = ({ selectedCompany, selectedTicker
         new Date(b.date).getTime() - new Date(a.date).getTime()
       );
 
-      setChartData({
-        labels: sortedData.map((item: any) => item.date),
-        datasets: [
-          {
-            label: 'Close Price',
-            data: sortedData.map((item: any) => item.close),
-            borderColor: '#b9d6ee',
-            backgroundColor: 'rgba(185, 214, 238, 0.1)',
-            borderWidth: 2,
-            fill: true,
-            tension: 0.4
-          }
-        ]
-      });
+      setStockData(prevData => ({
+        ...prevData,
+        Ticker: symbol,
+        "Market Capitalization": sortedData[0]["Market Capitalization"],
+        Sector: sortedData[0].sector,
+        Rating: sortedData[0].rating,
+        "Rated On": "Not rated",
+        Price: sortedData[0].close,
+        eodhd: {
+          "General::Code": sortedData[0].symbol,
+          "General::Sector": sortedData[0].sector,
+          "Highlights::MarketCapitalization": sortedData[0]["Market Capitalization"],
+          "Valuation::TrailingPE": sortedData[0].trailing_pe,
+          "Valuation::PriceBookMRQ": sortedData[0].price_book_mrq,
+          "SplitsDividends::ForwardAnnualDividendYield": sortedData[0].dividend_yield,
+          "Technicals::Beta": sortedData[0].beta,
+          "Highlights::ReturnOnAssetsTTM": sortedData[0].return_on_assets_ttm,
+          "Highlights::ReturnOnEquityTTM": sortedData[0].return_on_equity_ttm,
+          "AnalystRatings::TargetPrice": sortedData[0].target_price,
+          "SplitsDividends::ExDividendDate": sortedData[0].ex_dividend_date,
+          "AnalystRatings::Rating": sortedData[0].rating,
+          "AnalystRatings::StrongBuy": sortedData[0].analyst_strong_buy,
+          "AnalystRatings::Buy": sortedData[0].analyst_buy,
+          "AnalystRatings::Hold": sortedData[0].analyst_hold,
+          "AnalystRatings::Sell": sortedData[0].analyst_sell,
+          "AnalystRatings::StrongSell": sortedData[0].analyst_strong_sell
+        },
+        market: sortedData[0].market,
+        recommendation: sortedData[0].recommendation as AIRecommendation || null
+      }));
     } catch (error) {
       console.error('Error fetching daily price data:', error);
     }
@@ -527,43 +549,6 @@ const RightPanel: React.FC<RightPanelProps> = ({ selectedCompany, selectedTicker
     return () => clearInterval(intervalId);
   }, [selectedTicker, selectedCompany]);
 
-  const chartOptions = {
-    responsive: true,
-    maintainAspectRatio: false,
-    plugins: {
-      legend: {
-        display: false
-      },
-      tooltip: {
-        mode: 'index' as const,
-        intersect: false,
-        backgroundColor: 'rgba(0, 0, 0, 0.8)',
-        titleColor: '#b9d6ee',
-        bodyColor: '#b9d6ee',
-        borderColor: '#b9d6ee',
-        borderWidth: 1
-      }
-    },
-    scales: {
-      x: {
-        grid: {
-          color: 'rgba(185, 214, 238, 0.1)'
-        },
-        ticks: {
-          color: '#b9d6ee'
-        }
-      },
-      y: {
-        grid: {
-          color: 'rgba(185, 214, 238, 0.1)'
-        },
-        ticks: {
-          color: '#b9d6ee'
-        }
-      }
-    }
-  };
-
   const getRatingBackground = (rating: string | number | undefined) => {
     if (!rating || rating === 'N/A') return 'from-gray-500/5 border-gray-500/30';
     const ratingStr = String(rating).toUpperCase();
@@ -620,6 +605,15 @@ const RightPanel: React.FC<RightPanelProps> = ({ selectedCompany, selectedTicker
 
   return (
     <div className="flex-1 glass-panel p-8 overflow-hidden flex flex-col w-full bg-gradient-to-br from-black/40 to-[#b9d6ee]/5 backdrop-blur-xl">
+      {isExporting && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-black/80 p-8 rounded-xl flex flex-col items-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[#b9d6ee] mb-4"></div>
+            <p className="text-[#b9d6ee] font-semibold">Generando PDF...</p>
+          </div>
+        </div>
+      )}
+      
       {selectedCompany ? (
         <div className="flex flex-col items-center p-3 overflow-auto w-full" ref={contentRef}>
           <div className="flex justify-between items-start w-full mb-8">
@@ -845,7 +839,7 @@ const RightPanel: React.FC<RightPanelProps> = ({ selectedCompany, selectedTicker
                   <div className="h-px flex-1 bg-gradient-to-r from-[#b9d6ee]/20 to-transparent"></div>
                 </h3>
                 <div className="h-64">
-                  <Line data={chartData} options={chartOptions} />
+                  <StockChart symbol={selectedTicker} />
                 </div>
             </div>
             </>

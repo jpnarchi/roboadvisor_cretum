@@ -9,9 +9,9 @@ import {
   Title,
   Tooltip,
   Legend,
-  ChartData
 } from 'chart.js';
 
+// Registrar los componentes necesarios
 ChartJS.register(
   CategoryScale,
   LinearScale,
@@ -26,23 +26,21 @@ interface StockChartProps {
   symbol: string;
 }
 
-interface SMAData {
-  date: string;
-  sma: number;
-}
-
 const StockChart: React.FC<StockChartProps> = ({ symbol }) => {
-  const [chartData, setChartData] = useState<ChartData<'line'>>({
+  const [chartData, setChartData] = useState({
     labels: [],
     datasets: [
       {
-        label: 'SMA 50',
+        label: '',
         data: [],
-        borderColor: '#b9d6ee',
-        backgroundColor: 'rgba(185, 214, 238, 0.1)',
-        borderWidth: 2,
-        fill: true,
-        tension: 0.4
+        borderColor: '#b9d6ee', // Azul celeste
+        backgroundColor: 'rgba(185, 214, 238, 0.1)', // Azul celeste con transparencia
+        borderWidth: 1.5,
+        pointRadius: 1, // Puntos más pequeños ya que hay muchos
+        pointHoverRadius: 5,
+        pointBackgroundColor: '#b9d6ee',
+        pointBorderColor: '#FFFFFF',
+        pointBorderWidth: 1.5,
       }
     ]
   });
@@ -52,99 +50,78 @@ const StockChart: React.FC<StockChartProps> = ({ symbol }) => {
 
   useEffect(() => {
     const fetchData = async () => {
-      if (!symbol) return;
+      if (!symbol) {
+        setError('No se ha proporcionado un símbolo');
+        setIsLoading(false);
+        return;
+      }
       
       setIsLoading(true);
       setError(null);
       
       try {
-        // Obtener la fecha de ayer y la fecha de hace un año
+        // Configurar fechas para 3 años atrás
         const endDate = new Date();
-        endDate.setDate(endDate.getDate() - 1); // Ayer
         const startDate = new Date();
-        startDate.setFullYear(startDate.getFullYear() - 1); // Hace un año
+        startDate.setFullYear(startDate.getFullYear() - 1);
 
-        // Formatear las fechas para la API
         const fromDate = startDate.toISOString().split('T')[0];
         const toDate = endDate.toISOString().split('T')[0];
 
-        // Construir la URL de la API - IMPORTANTE: Cambiado a order=a (ascendente)
-        const apiUrl = `https://eodhd.com/api/technical/${symbol}.US?order=a&from=${fromDate}&to=${toDate}&function=sma&period=50&api_token=6824b2d80fe347.44604306&fmt=json`;
-        
-        console.log('Fetching data from:', apiUrl);
+        // Registrar la consulta para depuración
+        console.log(`Fetching data for ${symbol} from ${fromDate} to ${toDate}`);
+
+        // Hacer la solicitud a la API
+        const apiUrl = `https://eodhd.com/api/eod/${symbol}.US?order=a&from=${fromDate}&to=${toDate}&api_token=6824b2d80fe347.44604306&fmt=json`;
         
         const response = await fetch(apiUrl);
         if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
+          throw new Error(`Error HTTP: ${response.status}`);
         }
         
-        const data: SMAData[] = await response.json();
-        console.log('Received data length:', data.length);
+        // Obtener y procesar los datos
+        const data = await response.json();
+        console.log(`Received ${data.length} data points`);
         
         if (!data || data.length === 0) {
-          throw new Error('No data received from API');
+          throw new Error('No se recibieron datos de la API');
         }
-        
-        // Crear un array con fechas ya parseadas para mejor ordenamiento
-        const dataWithParsedDates = data.map(item => ({
-          ...item,
-          parsedDate: new Date(item.date)
-        }));
-        
-        // IMPORTANTE: Ordenar explícitamente por fecha (de más antiguo a más reciente)
-        // Esto es crucial para asegurar que el ordenamiento sea correcto
-        const sortedData = [...dataWithParsedDates].sort(
-          (a, b) => a.parsedDate.getTime() - b.parsedDate.getTime()
-        );
-        
-        // Imprimir la primera y última fecha para verificar
-        if (sortedData.length > 0) {
-          console.log('First date:', sortedData[0].date);
-          console.log('Last date:', sortedData[sortedData.length - 1].date);
-        }
-        
-        // Formatear fechas para mejor visualización en el gráfico
-        
-        // Detectar y eliminar valores extremos que podrían distorsionar el gráfico
-        const values = sortedData.map(item => item.sma);
-        const mean = values.reduce((sum, val) => sum + val, 0) / values.length;
-        const stdDev = Math.sqrt(
-          values.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / values.length
-        );
-        
-        // Filtrar valores que están a más de 3 desviaciones estándar
-        const threshold = 3 * stdDev;
-        const filteredData = sortedData.filter(
-          item => Math.abs(item.sma - mean) <= threshold
-        );
-        
-        console.log(`Filtered out ${sortedData.length - filteredData.length} outliers`);
-        
-        // IMPORTANTE: Crear un nuevo array de labels que corresponda a los datos filtrados
-        const filteredLabels = filteredData.map(item => {
-          const date = item.parsedDate;
-          return `${date.getMonth() + 1}/${date.getDate()}/${date.getFullYear().toString().substring(2)}`;
+
+        // Transformar los datos directamente, sin agrupación por mes
+        const prices = data.map((item: { close: string | number }) => Number(item.close));
+        const dates = data.map((item: { date: string }) => {
+          const date = new Date(item.date);
+          return date.toLocaleDateString('es-ES', { 
+            day: '2-digit', 
+            month: '2-digit', 
+            year: '2-digit'
+          });
         });
-        
+
+        // Confirmar que tenemos datos válidos
+        console.log(`Precios: ${prices.length} puntos, Rango: ${Math.min(...prices)} - ${Math.max(...prices)}`);
+
+        // Actualizar los datos del gráfico
         setChartData({
-          // Usar los labels filtrados
-          labels: filteredLabels,
+          labels: dates,
           datasets: [
             {
-              label: 'SMA 50',
-              // Usar solo los valores de los datos filtrados
-              data: filteredData.map(item => item.sma),
+              label: '',
+              data: prices,
               borderColor: '#b9d6ee',
               backgroundColor: 'rgba(185, 214, 238, 0.1)',
-              borderWidth: 2,
-              fill: true,
-              tension: 0.4
+              borderWidth: 1.5,
+              pointRadius: 1,
+              pointHoverRadius: 5,
+              pointBackgroundColor: '#b9d6ee',
+              pointBorderColor: '#FFFFFF',
+              pointBorderWidth: 1.5,
             }
           ]
         });
       } catch (error) {
-        console.error('Error fetching stock data:', error);
-        setError(error instanceof Error ? error.message : 'Error fetching data');
+        console.error('Error al obtener datos:', error);
+        setError(error instanceof Error ? error.message : 'Error desconocido');
       } finally {
         setIsLoading(false);
       }
@@ -153,6 +130,7 @@ const StockChart: React.FC<StockChartProps> = ({ symbol }) => {
     fetchData();
   }, [symbol]);
 
+  // Configuraciones del gráfico
   const chartOptions = {
     responsive: true,
     maintainAspectRatio: false,
@@ -167,50 +145,116 @@ const StockChart: React.FC<StockChartProps> = ({ symbol }) => {
         titleColor: '#b9d6ee',
         bodyColor: '#b9d6ee',
         borderColor: '#b9d6ee',
-        borderWidth: 1
+        borderWidth: 1,
+        callbacks: {
+          label: function(context: any) {
+            return `Precio: $${context.raw.toFixed(2)}`;
+          }
+        }
+      },
+      title: {
+        display: false
       }
     },
     scales: {
+      y: {
+        position: 'right' as const,
+        grid: {
+          color: 'rgba(185, 214, 238, 0.1)'
+        },
+        ticks: {
+          callback: function(value: any) {
+            return '$' + value;
+          },
+          font: {
+            size: 12
+          },
+          color: '#b9d6ee'
+        },
+        title: {
+          display: true,
+          text: 'Precio ($)',
+          font: {
+            size: 14
+          },
+          color: '#b9d6ee'
+        }
+      },
       x: {
         grid: {
           color: 'rgba(185, 214, 238, 0.1)'
         },
         ticks: {
-          color: '#b9d6ee',
           maxRotation: 45,
           minRotation: 45,
-          // Mostrar un número limitado de etiquetas para evitar superposición
-          maxTicksLimit: 8,
-          callback: function(tickValue: number | string, index: number): string {
-            // Solo mostrar algunas etiquetas para evitar aglomeración
-            return index % 3 === 0 ? tickValue.toString() : '';
-          }
-        }
-      },
-      y: {
-        grid: {
-          color: 'rgba(185, 214, 238, 0.1)'
-        },
-        ticks: {
+          autoSkip: true,
+          maxTicksLimit: 20,
+          font: {
+            size: 10
+          },
           color: '#b9d6ee'
         },
-        // Asegurar que la escala comience desde cero
-        beginAtZero: true
+        title: {
+          display: true,
+          text: 'Fecha',
+          font: {
+            size: 14
+          },
+          color: '#b9d6ee'
+        }
       }
-    }
+    },
+    elements: {
+      line: {
+        tension: 0.1 // Menos suavizado para mostrar mejor las fluctuaciones
+      }
+    },
+    animation: {
+      duration: 1500 // Animación al cargar
+    },
+    color: '#b9d6ee'
   };
 
+  // Renderizado condicional
   if (isLoading) {
-    return <div className="h-64 flex items-center justify-center text-[#b9d6ee]">Loading chart data...</div>;
+    return (
+      <div className="flex items-center justify-center h-64 bg-black rounded-lg">
+        <p className="text-[#b9d6ee] font-semibold">Cargando datos...</p>
+      </div>
+    );
   }
 
   if (error) {
-    return <div className="h-64 flex items-center justify-center text-red-500">Error: {error}</div>;
+    return (
+      <div className="flex items-center justify-center h-64 bg-black rounded-lg">
+        <div className="text-center px-4">
+          <p className="text-red-500 font-semibold">{error}</p>
+          <p className="text-[#b9d6ee] mt-2">Símbolo: {symbol}</p>
+        </div>
+      </div>
+    );
   }
 
+  if (!chartData.labels.length || !chartData.datasets[0].data.length) {
+    return (
+      <div className="flex items-center justify-center h-64 bg-black rounded-lg">
+        <div className="text-center px-4">
+          <p className="text-[#b9d6ee] font-semibold">No hay datos disponibles</p>
+          <p className="text-[#b9d6ee] mt-2">Símbolo: {symbol}</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Registrar información para depuración
+  console.log(`Renderizando gráfico con ${chartData.datasets[0].data.length} puntos de datos`);
+
   return (
-    <div className="h-64 w-full">
-      <Line data={chartData} options={chartOptions} />
+    <div className="h-64 w-full bg-black rounded-lg shadow p-4">
+      <Line 
+        data={chartData} 
+        options={chartOptions}
+      />
     </div>
   );
 };
