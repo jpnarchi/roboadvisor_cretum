@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Line } from 'react-chartjs-2';
 import {
   Chart as ChartJS,
@@ -9,6 +9,7 @@ import {
   Title,
   Tooltip,
   Legend,
+  Filler
 } from 'chart.js';
 
 // Registrar los componentes necesarios
@@ -19,48 +20,47 @@ ChartJS.register(
   LineElement,
   Title,
   Tooltip,
-  Legend
+  Legend,
+  Filler
 );
+
+const API_TOKEN = '6824b2d80fe347.44604306';
 
 interface StockChartProps {
   symbol: string;
 }
 
-const StockChart: React.FC<StockChartProps> = ({ symbol }) => {
-  const [chartData, setChartData] = useState({
-    labels: [],
-    datasets: [
-      {
-        label: '',
-        data: [],
-        borderColor: '#b9d6ee', // Azul celeste
-        backgroundColor: 'rgba(185, 214, 238, 0.1)', // Azul celeste con transparencia
-        borderWidth: 1.5,
-        pointRadius: 1, // Puntos más pequeños ya que hay muchos
-        pointHoverRadius: 5,
-        pointBackgroundColor: '#b9d6ee',
-        pointBorderColor: '#FFFFFF',
-        pointBorderWidth: 1.5,
-      }
-    ]
-  });
+interface ChartData {
+  labels: string[];
+  datasets: {
+    label: string;
+    data: number[];
+    borderColor: string;
+    backgroundColor: string;
+    fill: boolean;
+    tension: number;
+  }[];
+}
 
-  const [isLoading, setIsLoading] = useState(true);
+const StockChart: React.FC<StockChartProps> = ({ symbol }) => {
+  const [chartData, setChartData] = useState<ChartData | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchData = async () => {
-      if (!symbol) {
-        setError('No se ha proporcionado un símbolo');
-        setIsLoading(false);
-        return;
-      }
-      
-      setIsLoading(true);
-      setError(null);
-      
       try {
-        // Configurar fechas para 3 años atrás
+        setIsLoading(true);
+        setError(null);
+
+        const cleanSymbol = symbol.includes('.') 
+          ? `${symbol.split('.')[0]}.${symbol.split('.')[1] === 'BMV' ? 'MX' : 
+             symbol.split('.')[1] === 'DEX' ? 'DE' : 
+             symbol.split('.')[1] === 'LON' ? 'GB' : 
+             symbol.split('.')[1] === 'MIL' ? 'IT' : 'US'}`
+          : `${symbol}.US`;
+
+        // Get dates for last year
         const endDate = new Date();
         const startDate = new Date();
         startDate.setFullYear(startDate.getFullYear() - 1);
@@ -68,28 +68,26 @@ const StockChart: React.FC<StockChartProps> = ({ symbol }) => {
         const fromDate = startDate.toISOString().split('T')[0];
         const toDate = endDate.toISOString().split('T')[0];
 
-        // Registrar la consulta para depuración
-        console.log(`Fetching data for ${symbol} from ${fromDate} to ${toDate}`);
+        const response = await fetch(
+          `https://eodhd.com/api/eod/${cleanSymbol}?from=${fromDate}&to=${toDate}&api_token=${API_TOKEN}&fmt=json`
+        );
 
-        // Hacer la solicitud a la API
-        const apiUrl = `https://eodhd.com/api/eod/${symbol}.US?order=a&from=${fromDate}&to=${toDate}&api_token=6824b2d80fe347.44604306&fmt=json`;
-        
-        const response = await fetch(apiUrl);
         if (!response.ok) {
-          throw new Error(`Error HTTP: ${response.status}`);
-        }
-        
-        // Obtener y procesar los datos
-        const data = await response.json();
-        console.log(`Received ${data.length} data points`);
-        
-        if (!data || data.length === 0) {
-          throw new Error('No se recibieron datos de la API');
+          throw new Error(`HTTP error! status: ${response.status}`);
         }
 
-        // Transformar los datos directamente, sin agrupación por mes
-        const prices = data.map((item: { close: string | number }) => Number(item.close));
-        const dates = data.map((item: { date: string }) => {
+        const data = await response.json();
+
+        if (!data || data.length === 0) {
+          throw new Error('No se encontraron datos para este símbolo');
+        }
+
+        // Sort data by date (newest first)
+        const sortedData = data.sort((a: any, b: any) => 
+          new Date(b.date).getTime() - new Date(a.date).getTime()
+        );
+
+        const dates = sortedData.map((item: any) => {
           const date = new Date(item.date);
           return date.toLocaleDateString('es-ES', { 
             day: '2-digit', 
@@ -98,36 +96,32 @@ const StockChart: React.FC<StockChartProps> = ({ symbol }) => {
           });
         });
 
-        // Confirmar que tenemos datos válidos
-        console.log(`Precios: ${prices.length} puntos, Rango: ${Math.min(...prices)} - ${Math.max(...prices)}`);
+        const prices = sortedData.map((item: any) => Number(item.close));
 
-        // Actualizar los datos del gráfico
         setChartData({
           labels: dates,
           datasets: [
             {
-              label: '',
+              label: `${symbol} - Precio de cierre`,
               data: prices,
               borderColor: '#b9d6ee',
               backgroundColor: 'rgba(185, 214, 238, 0.1)',
-              borderWidth: 1.5,
-              pointRadius: 1,
-              pointHoverRadius: 5,
-              pointBackgroundColor: '#b9d6ee',
-              pointBorderColor: '#FFFFFF',
-              pointBorderWidth: 1.5,
+              fill: true,
+              tension: 0.4
             }
           ]
         });
-      } catch (error) {
+      } catch (error: any) {
         console.error('Error al obtener datos:', error);
-        setError(error instanceof Error ? error.message : 'Error desconocido');
+        setError(error.message || 'Error al cargar los datos');
       } finally {
         setIsLoading(false);
       }
     };
 
-    fetchData();
+    if (symbol) {
+      fetchData();
+    }
   }, [symbol]);
 
   // Configuraciones del gráfico
@@ -235,7 +229,7 @@ const StockChart: React.FC<StockChartProps> = ({ symbol }) => {
     );
   }
 
-  if (!chartData.labels.length || !chartData.datasets[0].data.length) {
+  if (!chartData) {
     return (
       <div className="flex items-center justify-center h-64 bg-black rounded-lg">
         <div className="text-center px-4">

@@ -1,3 +1,8 @@
+import React from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import Login from './pages/Login';
+import Register from './pages/Register';
+import { supabase } from './lib/supabaseClient';
 import { useState, useEffect } from 'react';
 import { Download } from 'lucide-react';
 import RightPanel from './components/RightPanel';
@@ -107,7 +112,170 @@ const stockTickers: StockData[] = [
   { symbol: 'FEMSAUB.MX', name: 'Grupo Femsa', market: 'MX' }
 ];
 
-function App() {
+const PrivateRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [session, setSession] = React.useState<any>(null);
+  const [loading, setLoading] = React.useState(true);
+
+  React.useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      setLoading(false);
+    });
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-black/40 to-[#b9d6ee]/5 backdrop-blur-xl">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[#b9d6ee]"></div>
+      </div>
+    );
+  }
+
+  if (!session) {
+    return <Navigate to="/login" />;
+  }
+
+  return <>{children}</>;
+};
+
+interface DashboardProps {
+  lastUpdate: string;
+  handleUpdateData: () => void;
+  exportStockData: () => void;
+  isExporting: boolean;
+  exportProgress: number;
+  currentView: 'dashboard' | 'reports';
+  setCurrentView: (view: 'dashboard' | 'reports') => void;
+  stocks: StockData[];
+  handleStockClick: (symbol: string) => void;
+  error: string | null;
+  handleCompanySelected: (company: string, ticker: string) => void;
+  selectedCompany: string | null;
+  selectedTicker: string | null;
+  searchQuery: string;
+  setSearchQuery: (query: string) => void;
+}
+
+const Dashboard: React.FC<DashboardProps> = ({
+  lastUpdate,
+  handleUpdateData,
+  exportStockData,
+  isExporting,
+  exportProgress,
+  currentView,
+  setCurrentView,
+  stocks,
+  handleStockClick,
+  error,
+  handleCompanySelected,
+  selectedCompany,
+  selectedTicker,
+  searchQuery,
+  setSearchQuery
+}) => {
+  return (
+    <div className="min-h-screen bg-gray-100">
+      <ToastContainer position="top-right" autoClose={3000} />
+      <div className="flex flex-col h-screen bg-black text-[#b9d6ee]">
+        <header className="glass-panel px-6 py-4">
+          <div className="flex items-center justify-between max-w-7xl mx-auto">
+            <div className="flex items-center gap-4">
+              <img src="/menlog.svg" alt="CRETUM Partners Logo" className="h-12 w-auto" />
+              <div>
+                <h1 className="text-2xl font-bold text-[#b9d6ee]">Robo Advisor</h1>
+                <p className="text-sm text-[#b9d6ee]">Passion Beyond Money</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-4">
+              <span className="text-sm text-[#b9d6ee]/70">
+                Last chart update: {lastUpdate}
+              </span>
+              <button
+                onClick={handleUpdateData}
+                className="p-2 rounded-full hover:bg-white/10 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#b9d6ee] text-[#b9d6ee]"
+                title="Update Data"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="h-6 w-6"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                  />
+                </svg>
+              </button>
+              <button
+                onClick={exportStockData}
+                disabled={isExporting}
+                className="px-4 py-2 bg-[#b9d6ee]/10 hover:bg-[#b9d6ee]/20 text-[#b9d6ee] rounded-lg border border-[#b9d6ee]/20 transition-all duration-200 flex items-center gap-2 shadow-glow disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Download className="w-5 h-5" />
+                {isExporting ? `Exporting (${Math.round(exportProgress)}%)` : 'Export Data'}
+              </button>
+              <button 
+                onClick={() => setCurrentView('dashboard')}
+                className={`px-4 py-2 rounded-lg button-glow ${
+                  currentView === 'dashboard' 
+                    ? 'bg-[#b9d6ee] text-black' 
+                    : 'bg-black/50 text-[#b9d6ee] hover:text-white'
+                }`}
+              >
+                Panel
+              </button>
+              <button 
+                onClick={() => setCurrentView('reports')}
+                className={`px-4 py-2 rounded-lg button-glow ${
+                  currentView === 'reports' 
+                    ? 'bg-[#b9d6ee] text-black' 
+                    : 'bg-black/50 text-[#b9d6ee] hover:text-white'
+                }`}
+              >
+                Reports
+              </button>
+            </div>
+          </div>
+        </header>
+
+        <StockTicker 
+          stocks={stocks}
+          onStockClick={handleStockClick}
+          error={error}
+        />
+
+        {currentView === 'dashboard' ? (
+          <div className="flex flex-1 gap-4 p-4 overflow-hidden">
+            <AIAssistant 
+              onCompanySelected={handleCompanySelected} 
+              stocks={stocks} 
+            />
+            <RightPanel selectedCompany={selectedCompany} selectedTicker={selectedTicker} />
+          </div>
+        ) : (
+          <MarketReports 
+            searchQuery={searchQuery}
+            onSearchChange={setSearchQuery}
+          />
+        )}
+      </div>
+    </div>
+  );
+};
+
+const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<'dashboard' | 'reports'>('dashboard');
   const [searchQuery, setSearchQuery] = useState('');
   const [stocks, setStocks] = useState<StockData[]>(stockTickers);
@@ -419,116 +587,50 @@ function App() {
         const link = document.createElement('a');
         const url = URL.createObjectURL(blob);
         link.setAttribute('href', url);
-        link.setAttribute('download', `stock_data_${new Date().toISOString().split('T')[0]}.csv`);
-        document.body.appendChild(link);
+        link.setAttribute('download', `stock_data_${new Date().toISOString()}.csv`);
         link.click();
-        document.body.removeChild(link);
-        
-        toast.success('Data exported successfully!');
-      } else {
-        toast.error('No data to export. Please try again later.');
       }
     } catch (error) {
-      console.error('Error exporting data:', error);
-      toast.error('Failed to export data. Please try again later.');
+      console.error('Error exporting stock data:', error);
+      toast.error('Failed to export stock data. Please try again later.');
     } finally {
       setIsExporting(false);
-      setExportProgress(0);
     }
   };
 
   return (
-    <div className="min-h-screen bg-gray-100">
-      <ToastContainer position="top-right" autoClose={3000} />
-      <div className="flex flex-col h-screen bg-black text-[#b9d6ee]">
-        <header className="glass-panel px-6 py-4">
-          <div className="flex items-center justify-between max-w-7xl mx-auto">
-            <div className="flex items-center gap-4">
-              <img src="/menlog.svg" alt="CRETUM Partners Logo" className="h-12 w-auto" />
-              <div>
-                <h1 className="text-2xl font-bold text-[#b9d6ee]">Robo Advisor</h1>
-                <p className="text-sm text-[#b9d6ee]">Passion Beyond Money</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-4">
-              <span className="text-sm text-[#b9d6ee]/70">
-                Last chart update: {lastUpdate}
-              </span>
-              <button
-                onClick={() => handleUpdateData()}
-                className="p-2 rounded-full hover:bg-white/10 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#b9d6ee] text-[#b9d6ee]"
-                title="Update Data"
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="h-6 w-6"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-                  />
-                </svg>
-              </button>
-              <button
-                onClick={exportStockData}
-                disabled={isExporting}
-                className="px-4 py-2 bg-[#b9d6ee]/10 hover:bg-[#b9d6ee]/20 text-[#b9d6ee] rounded-lg border border-[#b9d6ee]/20 transition-all duration-200 flex items-center gap-2 shadow-glow disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <Download className="w-5 h-5" />
-                {isExporting ? `Exporting (${Math.round(exportProgress)}%)` : 'Export Data'}
-              </button>
-              <button 
-                onClick={() => setCurrentView('dashboard')}
-                className={`px-4 py-2 rounded-lg button-glow ${
-                  currentView === 'dashboard' 
-                    ? 'bg-[#b9d6ee] text-black' 
-                    : 'bg-black/50 text-[#b9d6ee] hover:text-white'
-                }`}
-              >
-                Panel
-              </button>
-              <button 
-                onClick={() => setCurrentView('reports')}
-                className={`px-4 py-2 rounded-lg button-glow ${
-                  currentView === 'reports' 
-                    ? 'bg-[#b9d6ee] text-black' 
-                    : 'bg-black/50 text-[#b9d6ee] hover:text-white'
-                }`}
-              >
-                Reports
-              </button>
-            </div>
-          </div>
-        </header>
-
-        <StockTicker 
-          stocks={stocks}
-          onStockClick={handleStockClick}
-          error={error}
+    <Router>
+      <Routes>
+        <Route path="/login" element={<Login />} />
+        <Route path="/register" element={<Register />} />
+        <Route
+          path="/dashboard"
+          element={
+            <PrivateRoute>
+              <Dashboard 
+                lastUpdate={lastUpdate}
+                handleUpdateData={handleUpdateData}
+                exportStockData={exportStockData}
+                isExporting={isExporting}
+                exportProgress={exportProgress}
+                currentView={currentView}
+                setCurrentView={setCurrentView}
+                stocks={stocks}
+                handleStockClick={handleStockClick}
+                error={error}
+                handleCompanySelected={handleCompanySelected}
+                selectedCompany={selectedCompany}
+                selectedTicker={selectedTicker}
+                searchQuery={searchQuery}
+                setSearchQuery={setSearchQuery}
+              />
+            </PrivateRoute>
+          }
         />
-
-        {currentView === 'dashboard' ? (
-          <div className="flex flex-1 gap-4 p-4 overflow-hidden">
-            <AIAssistant 
-              onCompanySelected={handleCompanySelected} 
-              stocks={stocks} 
-            />
-            <RightPanel selectedCompany={selectedCompany} selectedTicker={selectedTicker} />
-          </div>
-        ) : (
-          <MarketReports 
-            searchQuery={searchQuery}
-            onSearchChange={setSearchQuery}
-          />
-        )}
-      </div>
-    </div>
+        <Route path="/" element={<Navigate to="/dashboard" />} />
+      </Routes>
+    </Router>
   );
-}
+};
 
 export default App;

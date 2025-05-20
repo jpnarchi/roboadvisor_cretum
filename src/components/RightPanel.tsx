@@ -76,6 +76,9 @@ interface EODHDCompanyOverview {
   "AnalystRatings::Hold": number;
   "AnalystRatings::Sell": number;
   "AnalystRatings::StrongSell": number;
+  "Highlights::EPS": number;
+  "Highlights::52WeekHigh": number;
+  "Highlights::52WeekLow": number;
 }
 
 // Legacy interface to maintain compatibility
@@ -134,22 +137,10 @@ interface StockData {
   market?: string;
   recommendation?: AIRecommendation | null;
   explanation?: string;
-}
-
-interface PortfolioTrendData {
-  Weight: string;
-  Ticker: string;
-  Name: string;
-  Price: string;
-  Currency: string;
-  "Market Capitalization": string;
-  Sector: string;
-  Rating: string;
-  "Rated On": string;
-  "Since Rated": string;
-  "Smart Momentum": number;
-  Retracement: string;
-  "Trend Strength": number;
+  "Since Rated"?: string;
+  "Smart Momentum"?: number;
+  Retracement?: string;
+  "Trend Strength"?: number;
 }
 
 // Add cache at the top of the file, after imports
@@ -180,10 +171,10 @@ const RightPanel: React.FC<RightPanelProps> = ({ selectedCompany, selectedTicker
         filename: `${selectedTicker}_analysis.pdf`,
         image: { type: 'jpeg', quality: 1 },
         html2canvas: { 
-          scale: 2,
+          scale: 1,
           useCORS: true,
           logging: false,
-          backgroundColor: '#ffffff',
+          backgroundColor: 'black',
           windowWidth: element.scrollWidth,
           windowHeight: element.scrollHeight,
           onclone: (clonedDoc: Document) => {
@@ -191,15 +182,17 @@ const RightPanel: React.FC<RightPanelProps> = ({ selectedCompany, selectedTicker
             const style = clonedDoc.createElement('style');
             style.textContent = `
               * {
-                -webkit-print-color-adjust: exact !important;
+                
+                text-color: black !important;
                 color-adjust: exact !important;
+                background-color: black !important;
               }
               .glass-panel {
-                background: white !important;
+                background: black !important;
                 box-shadow: none !important;
               }
               .bg-black, .bg-black\\/40, .bg-black\\/50, .bg-black\\/80 {
-                background: white !important;
+                background: black !important;
               }
               .from-black\\/40, .to-\\[\\#b9d6ee\\]\\/5 {
                 background: white !important;
@@ -209,6 +202,7 @@ const RightPanel: React.FC<RightPanelProps> = ({ selectedCompany, selectedTicker
               }
               canvas {
                 max-width: 100% !important;
+                background-color: black !important;
                 height: auto !important;
               }
             `;
@@ -412,7 +406,10 @@ const RightPanel: React.FC<RightPanelProps> = ({ selectedCompany, selectedTicker
           "AnalystRatings::Buy": sortedData[0].analyst_buy,
           "AnalystRatings::Hold": sortedData[0].analyst_hold,
           "AnalystRatings::Sell": sortedData[0].analyst_sell,
-          "AnalystRatings::StrongSell": sortedData[0].analyst_strong_sell
+          "AnalystRatings::StrongSell": sortedData[0].analyst_strong_sell,
+          "Highlights::EPS": sortedData[0].eps,
+          "Highlights::52WeekHigh": sortedData[0]["52WeekHigh"],
+          "Highlights::52WeekLow": sortedData[0]["52WeekLow"]
         },
         market: sortedData[0].market,
         recommendation: sortedData[0].recommendation as AIRecommendation || null
@@ -513,28 +510,16 @@ const RightPanel: React.FC<RightPanelProps> = ({ selectedCompany, selectedTicker
         const data = JSON.parse(sanitizedText);
 
         const stockTrend = data.find((item: any) => item.Ticker === selectedTicker);
-        if (stockTrend) {
-          const typedStockTrend: PortfolioTrendData = {
-            Weight: String(stockTrend.Weight || "0.00%"),
-            Ticker: String(stockTrend.Ticker),
-            Name: String(stockTrend.Name || ""),
-            Price: String(stockTrend.Price || "N/A"),
-            Currency: String(stockTrend.Currency || "USD"),
-            "Market Capitalization": String(stockTrend["Market Capitalization"] || "N/A"),
-            Sector: String(stockTrend.Sector || "N/A"),
-            Rating: String(stockTrend.Rating || "N/A").toUpperCase(),
-            "Rated On": stockTrend["Rated On"] ? String(stockTrend["Rated On"]) : new Date().toISOString().split('T')[0],
+        if (stockTrend && stockData) {
+          setStockData({
+            ...stockData,
+            Rating: String(stockTrend.Rating || "N/A"),
+            "Rated On": stockTrend["Rated On"] ? String(stockTrend["Rated On"]) : "Not rated",
             "Since Rated": String(stockTrend["Since Rated"] || "0%"),
             "Smart Momentum": Number(stockTrend["Smart Momentum"] || 0),
             Retracement: String(stockTrend.Retracement || "0%"),
             "Trend Strength": Number(stockTrend["Trend Strength"] || 0)
-          };
-          
-          setStockData(prevData => ({
-            ...typedStockTrend,
-            recommendation: prevData?.recommendation,
-            explanation: prevData?.explanation
-          }));
+          });
         }
       } catch (error) {
         console.error('Error processing portfolio trend:', error);
@@ -543,11 +528,11 @@ const RightPanel: React.FC<RightPanelProps> = ({ selectedCompany, selectedTicker
 
     fetchPortfolioTrend();
     
-    // Update portfolio trend every 5 minutes instead of 30 seconds
+    // Update portfolio trend every 5 minutes
     const intervalId = setInterval(fetchPortfolioTrend, 5 * 60 * 1000);
 
     return () => clearInterval(intervalId);
-  }, [selectedTicker, selectedCompany]);
+  }, [selectedTicker, stockData]);
 
   const getRatingBackground = (rating: string | number | undefined) => {
     if (!rating || rating === 'N/A') return 'from-gray-500/5 border-gray-500/30';
@@ -594,10 +579,19 @@ const RightPanel: React.FC<RightPanelProps> = ({ selectedCompany, selectedTicker
     return `$${num.toLocaleString('en-US', { maximumFractionDigits: 2 })}`;
   };
 
-  // Update the string/number conversions
-  const marketCap = typeof stockData?.["Market Capitalization"] === 'number' 
-    ? stockData["Market Capitalization"].toString() 
-    : stockData?.["Market Capitalization"];
+  // Remove unused variables
+  const marketCap = stockData?.eodhd?.["Highlights::MarketCapitalization"] || 
+                   stockData?.overview?.["MarketCapitalization"] || 
+                   'N/A';
+  const peRatio = stockData?.eodhd?.["Valuation::TrailingPE"] || 
+                  stockData?.overview?.["PERatio"] || 
+                  'N/A';
+  const dividendYield = stockData?.eodhd?.["SplitsDividends::ForwardAnnualDividendYield"] || 
+                       stockData?.overview?.["DividendYield"] || 
+                       'N/A';
+  const beta = stockData?.eodhd?.["Technicals::Beta"] || 
+              stockData?.overview?.["Beta"] || 
+              'N/A';
 
   const price = typeof stockData?.Price === 'number'
     ? stockData.Price.toString()
@@ -620,7 +614,7 @@ const RightPanel: React.FC<RightPanelProps> = ({ selectedCompany, selectedTicker
             <div className="flex-1">
               <div className="flex items-center justify-between w-full">
                 <div className="flex items-center gap-3 mb-2">
-                  <h2 className="text-4xl font-extrabold tracking-tight bg-gradient-to-r from-white to-[#b9d6ee] bg-clip-text text-transparent">{selectedCompany}</h2>
+                  <h2 className="text-4xl font-extrabold tracking-tight bg-gradient-to-r text-white bg-clip-text text-transparent">{selectedCompany}</h2>
                 {selectedTicker && (
                     <div className="flex items-center gap-2">
                       <span className="text-lg font-bold text-[#b9d6ee] bg-[#b9d6ee]/5 px-4 py-1.5 rounded-lg border border-[#b9d6ee]/20 shadow-glow">
@@ -691,7 +685,7 @@ const RightPanel: React.FC<RightPanelProps> = ({ selectedCompany, selectedTicker
                   <div className="grid grid-cols-2 gap-6">
                     <div>
                       <span className="text-sm text-[#b9d6ee]/70 font-medium">P/E Ratio</span>
-                      <p className="text-2xl font-bold text-white mt-1">{formatNumber(stockData.eodhd ? stockData.eodhd["Valuation::TrailingPE"] : stockData.overview?.PERatio)}</p>
+                      <p className="text-2xl font-bold text-white mt-1">{formatNumber(peRatio)}</p>
                     </div>
                     <div>
                       <span className="text-sm text-[#b9d6ee]/70 font-medium">P/B Ratio</span>
@@ -699,11 +693,11 @@ const RightPanel: React.FC<RightPanelProps> = ({ selectedCompany, selectedTicker
                     </div>
                     <div>
                       <span className="text-sm text-[#b9d6ee]/70 font-medium">Dividend Yield</span>
-                      <p className="text-2xl font-bold text-white mt-1">{formatPercentage(stockData.eodhd ? stockData.eodhd["SplitsDividends::ForwardAnnualDividendYield"] : stockData.overview?.DividendYield)}</p>
+                      <p className="text-2xl font-bold text-white mt-1">{formatPercentage(dividendYield)}</p>
                     </div>
                     <div>
                       <span className="text-sm text-[#b9d6ee]/70 font-medium">Beta</span>
-                      <p className="text-2xl font-bold text-white mt-1">{formatNumber(stockData.eodhd ? stockData.eodhd["Technicals::Beta"] : stockData.overview?.Beta)}</p>
+                      <p className="text-2xl font-bold text-white mt-1">{formatNumber(beta)}</p>
                     </div>
                     </div>
                   </div>
