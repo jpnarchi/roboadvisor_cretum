@@ -1,5 +1,4 @@
 import { AIRecommendation, AIResponse } from '../types/AIRecommendation';
-import { getCompanyData } from './companyService';
 import OpenAI from 'openai';
 
 // Initialize OpenAI client only if API key is available
@@ -9,6 +8,9 @@ const openai = import.meta.env.VITE_OPEN_AI_API_KEY
       dangerouslyAllowBrowser: true
     })
   : null;
+
+const EODHD_API_KEY = "6824b2d80fe347.44604306";
+const filters = "General::Code,General::Name,General::Sector,General::Industry,General::Description,Highlights::MarketCapitalization,Valuation::TrailingPE,Valuation::PriceBookMRQ,SplitsDividends::ForwardAnnualDividendYield,Technicals::Beta,Highlights::ReturnOnAssetsTTM,Highlights::ReturnOnEquityTTM,AnalystRatings::TargetPrice,SplitsDividends::ExDividendDate,AnalystRatings::Rating,AnalystRatings::StrongBuy,AnalystRatings::Buy,AnalystRatings::Hold,AnalystRatings::Sell,AnalystRatings::StrongSell,Highlights::EPS,Highlights::52WeekHigh,Highlights::52WeekLow";
 
 const SYSTEM_PROMPT = `A) Analiza cada acción del portafolio adjunto y clasifícala como "Comprar", "Vender" o "Mantener" siguiendo estos pasos:
 
@@ -107,7 +109,7 @@ Proporciona para cada acción:
 5. Nivel de confianza en la recomendación (Alto/Medio/Bajo)
 
 IMPORTANTE:
-TU RESPUESTA DEBE DER MUY CORTA Y CONCISA, MENOS DE 4 ORACIONES.
+TU RESPUESTA DEBE DER MUY CORTA Y CONCISA, MENOS DE 4 ORACIONES Y DEBE DE SER UN RESUMEN DE TU DECISIÓN DEBE DE SER UN PARRAFO Y NADA EXTENSA Y DEBE DE SER EN FORMATO MARKDOWN.
 
 
 
@@ -115,10 +117,19 @@ TU RESPUESTA DEBE DER MUY CORTA Y CONCISA, MENOS DE 4 ORACIONES.
 
 export const getAIRecommendation = async (ticker: string): Promise<AIResponse> => {
   try {
-    // Get company data to analyze
-    const companyData = await getCompanyData(ticker);
+    // Fetch company data from EODHD API
+    const response = await fetch(
+      `https://eodhd.com/api/fundamentals/${ticker}?filter=${filters}&api_token=${EODHD_API_KEY}&fmt=json`
+    );
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const companyData = await response.json();
     
-    if (!companyData) {
+    if (!companyData || Object.keys(companyData).length === 0) {
+      console.error('No company data received for ticker:', ticker);
       return {
         recommendation: 'NEUTRAL',
         explanation: `Unable to analyze ${ticker} due to insufficient data.`
@@ -133,37 +144,115 @@ export const getAIRecommendation = async (ticker: string): Promise<AIResponse> =
       };
     }
 
-    // Prepare the data for the AI
+    // Log the received data for debugging
+    console.log('Received company data:', companyData);
+
+    // Helper function to safely parse numeric values
+    const safeParseFloat = (value: any, defaultValue: number = 0): number => {
+      if (value === undefined || value === null || value === 'None' || value === '') {
+        return defaultValue;
+      }
+      const parsed = parseFloat(value);
+      return isNaN(parsed) ? defaultValue : parsed;
+    };
+
+    // Helper function to safely parse integer values
+    const safeParseInt = (value: any, defaultValue: number = 0): number => {
+      if (value === undefined || value === null || value === 'None' || value === '') {
+        return defaultValue;
+      }
+      const parsed = parseInt(value);
+      return isNaN(parsed) ? defaultValue : parsed;
+    };
+
+    // Prepare the data for the AI with safe parsing
     const companyMetrics = {
-      ticker: companyData.Symbol,
-      name: companyData.Name,
-      sector: companyData.Sector,
-      industry: companyData.Industry,
+      ticker: companyData["General::Code"] || ticker,
+      name: companyData["General::Name"] || 'Unknown',
+      sector: companyData["General::Sector"] || 'Unknown',
+      industry: companyData["General::Industry"] || 'Unknown',
+      description: companyData["General::Description"] || 'No description available',
       metrics: {
-        peRatio: parseFloat(companyData.PERatio || '0'),
-        pegRatio: parseFloat(companyData.PEGRatio || '0'),
-        dividendYield: parseFloat(companyData.DividendYield || '0'),
-        beta: parseFloat(companyData.Beta || '0'),
-        roe: parseFloat(companyData.ReturnOnEquityTTM || '0'),
-        profitMargin: parseFloat(companyData.ProfitMargin || '0'),
-        priceToBook: parseFloat(companyData.PriceToBookRatio || '0'),
-        revenueGrowth: parseFloat(companyData.QuarterlyRevenueGrowthYOY || '0'),
-        earningsGrowth: parseFloat(companyData.QuarterlyEarningsGrowthYOY || '0'),
-        analystTargetPrice: parseFloat(companyData.AnalystTargetPrice || '0'),
-        currentPrice: parseFloat(companyData["50DayMovingAverage"] || '0'),
-        description: companyData.Description
+        // Valuation Metrics
+        peRatio: safeParseFloat(companyData["Valuation::TrailingPE"]),
+        priceToBook: safeParseFloat(companyData["Valuation::PriceBookMRQ"]),
+        
+        // Market Data
+        marketCap: safeParseFloat(companyData["Highlights::MarketCapitalization"]),
+        beta: safeParseFloat(companyData["Technicals::Beta"]),
+        
+        // Returns & Efficiency
+        roa: safeParseFloat(companyData["Highlights::ReturnOnAssetsTTM"]),
+        roe: safeParseFloat(companyData["Highlights::ReturnOnEquityTTM"]),
+        
+        // Dividends
+        dividendYield: safeParseFloat(companyData["SplitsDividends::ForwardAnnualDividendYield"]),
+        
+        // Technical Indicators
+        eps: safeParseFloat(companyData["Highlights::EPS"]),
+        fiftyTwoWeekHigh: safeParseFloat(companyData["Highlights::52WeekHigh"]),
+        fiftyTwoWeekLow: safeParseFloat(companyData["Highlights::52WeekLow"]),
+        
+        // Analyst Ratings
+        targetPrice: safeParseFloat(companyData["AnalystRatings::TargetPrice"]),
+        rating: safeParseFloat(companyData["AnalystRatings::Rating"]),
+        analystStrongBuy: safeParseInt(companyData["AnalystRatings::StrongBuy"]),
+        analystBuy: safeParseInt(companyData["AnalystRatings::Buy"]),
+        analystHold: safeParseInt(companyData["AnalystRatings::Hold"]),
+        analystSell: safeParseInt(companyData["AnalystRatings::Sell"]),
+        analystStrongSell: safeParseInt(companyData["AnalystRatings::StrongSell"])
       }
     };
+
+    // Log the processed metrics for debugging
+    console.log('Processed company metrics:', companyMetrics);
 
     // Call OpenAI API
     const completion = await openai.chat.completions.create({
       model: "gpt-4-turbo-preview",
       messages: [
         { role: "system", content: SYSTEM_PROMPT },
-        { role: "user", content: `Analiza la siguiente acción: ${JSON.stringify(companyMetrics, null, 2)}` }
+        { role: "user", content: `Analiza la siguiente acción con todos sus datos financieros y de mercado:
+
+Símbolo: ${companyMetrics.ticker}
+Nombre: ${companyMetrics.name}
+Sector: ${companyMetrics.sector}
+Industria: ${companyMetrics.industry}
+Descripción: ${companyMetrics.description}
+
+Métricas de Valoración:
+- P/E Ratio: ${companyMetrics.metrics.peRatio}
+- P/B Ratio: ${companyMetrics.metrics.priceToBook}
+
+Datos de Mercado:
+- Capitalización de Mercado: $${companyMetrics.metrics.marketCap}
+- Beta: ${companyMetrics.metrics.beta}
+
+Retornos y Eficiencia:
+- ROA: ${companyMetrics.metrics.roa}%
+- ROE: ${companyMetrics.metrics.roe}%
+
+Dividendos:
+- Dividend Yield: ${companyMetrics.metrics.dividendYield}%
+
+Indicadores Técnicos:
+- EPS: $${companyMetrics.metrics.eps}
+- Máximo 52 semanas: $${companyMetrics.metrics.fiftyTwoWeekHigh}
+- Mínimo 52 semanas: $${companyMetrics.metrics.fiftyTwoWeekLow}
+
+Calificaciones de Analistas:
+- Precio Objetivo: $${companyMetrics.metrics.targetPrice}
+- Rating General: ${companyMetrics.metrics.rating}
+- Strong Buy: ${companyMetrics.metrics.analystStrongBuy}
+- Buy: ${companyMetrics.metrics.analystBuy}
+- Hold: ${companyMetrics.metrics.analystHold}
+- Sell: ${companyMetrics.metrics.analystSell}
+- Strong Sell: ${companyMetrics.metrics.analystStrongSell}
+
+Por favor, analiza estos datos y proporciona una recomendación concisa siguiendo los criterios establecidos.` }
       ],
       temperature: 0.7,
-      max_tokens: 1000
+      max_tokens: 500
     });
 
     const analysis = completion.choices[0].message.content;

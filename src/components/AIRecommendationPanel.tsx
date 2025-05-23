@@ -1,5 +1,6 @@
 import React, {memo} from 'react';
 import { AIRecommendation } from '../types/AIRecommendation';
+import ReactMarkdown from 'react-markdown';
 
 interface CompanyOverview {
   Symbol: string;
@@ -129,7 +130,11 @@ const AIRecommendationPanel: React.FC<AIRecommendationPanelProps> = ({
 
         <div className="text-[#b9d6ee]/80">
           <p className="font-medium mb-2">Analysis:</p>
-          <p>{explanation || 'No analysis available.'}</p>
+          <div className="prose prose-invert max-w-none whitespace-pre-line">
+            <ReactMarkdown>
+              {explanation || 'No analysis available.'}
+            </ReactMarkdown>
+          </div>
         </div>
 
         {companyOverview && (
