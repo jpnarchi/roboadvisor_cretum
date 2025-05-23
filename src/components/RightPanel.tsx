@@ -1,5 +1,4 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { getCompanyData, updateCompanyData } from '../services/companyService';
 import { getAIRecommendation } from '../services/aiService';
 import AIRecommendationPanel from './AIRecommendationPanel';
 import { AIRecommendation } from '../types/AIRecommendation';
