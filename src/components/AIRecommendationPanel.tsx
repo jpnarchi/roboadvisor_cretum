@@ -1,4 +1,4 @@
-import React, {memo} from 'react';
+import React, {memo, useMemo} from 'react';
 import { AIRecommendation } from '../types/AIRecommendation';
 import ReactMarkdown from 'react-markdown';
 
@@ -112,6 +112,36 @@ const AIRecommendationPanel: React.FC<AIRecommendationPanelProps> = ({
     return 'text-gray-500';
   };
 
+  // Memoize the recommendation colors and backgrounds
+  const recommendationColor = useMemo(() => getRecommendationColor(recommendation), [recommendation]);
+  const recommendationBackground = useMemo(() => getRecommendationBackground(recommendation), [recommendation]);
+
+  // Memoize the formatted metrics
+  const formattedMetrics = useMemo(() => {
+    if (!companyOverview) return null;
+    return {
+      peRatio: formatMetric(companyOverview.PERatio),
+      pegRatio: formatMetric(companyOverview.PEGRatio),
+      dividendYield: formatMetric(companyOverview.DividendYield),
+      roe: formatMetric(companyOverview.ReturnOnEquityTTM),
+      profitMargin: formatMetric(companyOverview.ProfitMargin),
+      beta: formatMetric(companyOverview.Beta)
+    };
+  }, [companyOverview]);
+
+  // Memoize the metric colors
+  const metricColors = useMemo(() => {
+    if (!companyOverview) return null;
+    return {
+      peRatio: getMetricColor(companyOverview.PERatio, 'negative'),
+      pegRatio: getMetricColor(companyOverview.PEGRatio, 'negative'),
+      dividendYield: getMetricColor(companyOverview.DividendYield, 'positive'),
+      roe: getMetricColor(companyOverview.ReturnOnEquityTTM, 'positive'),
+      profitMargin: getMetricColor(companyOverview.ProfitMargin, 'positive'),
+      beta: getMetricColor(companyOverview.Beta, 'negative')
+    };
+  }, [companyOverview]);
+
   return (
     <div className="glass-panel p-6 rounded-xl border border-[#b9d6ee]/10 bg-gradient-to-br from-[#b9d6ee]/5 to-transparent backdrop-blur-lg shadow-glow">
       <h3 className="text-lg font-semibold mb-6 text-[#b9d6ee] flex items-center">
@@ -119,10 +149,10 @@ const AIRecommendationPanel: React.FC<AIRecommendationPanelProps> = ({
         <div className="h-px flex-1 bg-gradient-to-r from-[#b9d6ee]/20 to-transparent"></div>
       </h3>
       <div className="space-y-4">
-        <div className={`p-4 rounded-lg border ${getRecommendationBackground(recommendation)}`}>
+        <div className={`p-4 rounded-lg border ${recommendationBackground}`}>
           <div className="flex items-center justify-between">
             <span className="text-sm text-[#b9d6ee]/70 font-medium">Recommendation</span>
-            <span className={`text-xl font-bold ${getRecommendationColor(recommendation)}`}>
+            <span className={`text-xl font-bold ${recommendationColor}`}>
               {recommendation || 'N/A'}
             </span>
           </div>
@@ -137,45 +167,45 @@ const AIRecommendationPanel: React.FC<AIRecommendationPanelProps> = ({
           </div>
         </div>
 
-        {companyOverview && (
+        {companyOverview && formattedMetrics && metricColors && (
           <div className="grid grid-cols-2 gap-4 mt-4">
             <div className="space-y-2">
               <div>
                 <span className="text-sm text-[#b9d6ee]/70">P/E Ratio</span>
-                <p className={`text-lg font-semibold ${getMetricColor(companyOverview.PERatio, 'negative')}`}>
-                  {formatMetric(companyOverview.PERatio)}
+                <p className={`text-lg font-semibold ${metricColors.peRatio}`}>
+                  {formattedMetrics.peRatio}
                 </p>
               </div>
               <div>
                 <span className="text-sm text-[#b9d6ee]/70">PEG Ratio</span>
-                <p className={`text-lg font-semibold ${getMetricColor(companyOverview.PEGRatio, 'negative')}`}>
-                  {formatMetric(companyOverview.PEGRatio)}
+                <p className={`text-lg font-semibold ${metricColors.pegRatio}`}>
+                  {formattedMetrics.pegRatio}
                 </p>
               </div>
               <div>
                 <span className="text-sm text-[#b9d6ee]/70">Dividend Yield</span>
-                <p className={`text-lg font-semibold ${getMetricColor(companyOverview.DividendYield, 'positive')}`}>
-                  {formatMetric(companyOverview.DividendYield)}%
+                <p className={`text-lg font-semibold ${metricColors.dividendYield}`}>
+                  {formattedMetrics.dividendYield}%
                 </p>
               </div>
             </div>
             <div className="space-y-2">
               <div>
                 <span className="text-sm text-[#b9d6ee]/70">Return on Equity</span>
-                <p className={`text-lg font-semibold ${getMetricColor(companyOverview.ReturnOnEquityTTM, 'positive')}`}>
-                  {formatMetric(companyOverview.ReturnOnEquityTTM)}%
+                <p className={`text-lg font-semibold ${metricColors.roe}`}>
+                  {formattedMetrics.roe}%
                 </p>
               </div>
               <div>
                 <span className="text-sm text-[#b9d6ee]/70">Profit Margin</span>
-                <p className={`text-lg font-semibold ${getMetricColor(companyOverview.ProfitMargin, 'positive')}`}>
-                  {formatMetric(companyOverview.ProfitMargin)}%
+                <p className={`text-lg font-semibold ${metricColors.profitMargin}`}>
+                  {formattedMetrics.profitMargin}%
                 </p>
               </div>
               <div>
                 <span className="text-sm text-[#b9d6ee]/70">Beta</span>
-                <p className={`text-lg font-semibold ${getMetricColor(companyOverview.Beta, 'negative')}`}>
-                  {formatMetric(companyOverview.Beta)}
+                <p className={`text-lg font-semibold ${metricColors.beta}`}>
+                  {formattedMetrics.beta}
                 </p>
               </div>
             </div>
@@ -193,4 +223,10 @@ const AIRecommendationPanel: React.FC<AIRecommendationPanelProps> = ({
   );
 };
 
-export default memo(AIRecommendationPanel);
+export default memo(AIRecommendationPanel, (prevProps, nextProps) => {
+  return (
+    prevProps.recommendation === nextProps.recommendation &&
+    prevProps.explanation === nextProps.explanation &&
+    JSON.stringify(prevProps.companyOverview) === JSON.stringify(nextProps.companyOverview)
+  );
+});
