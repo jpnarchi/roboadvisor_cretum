@@ -128,8 +128,8 @@ export const searchReports = async (type: 'quarter' | 'research' = 'quarter') =>
         .list();
 
       if (listError) {
-        console.error('Error listing files from bucket:', listError);
-        if (listError.statusCode === 403) {
+        console.error('Error listing files:', listError);
+        if (listError.message?.includes('403') || listError.message?.includes('permission denied')) {
           console.error('Permission denied. Please check bucket policies in Supabase.');
           return [];
         }
@@ -233,8 +233,9 @@ export const uploadReport = async (file: File, reportData: Omit<MarketReport, 'i
 
     if (uploadError) {
       console.error('Error uploading file:', uploadError);
-      if (uploadError.statusCode === 403) {
+      if (uploadError.message?.includes('403') || uploadError.message?.includes('permission denied')) {
         console.error('Permission denied. Please check bucket policies in Supabase.');
+        return null;
       }
       throw uploadError;
     }

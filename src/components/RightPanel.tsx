@@ -387,7 +387,8 @@ const RightPanel: React.FC<RightPanelProps> = ({ selectedCompany, selectedTicker
     let isMounted = true;
     
     const fetchPortfolioTrend = async () => {
-      const trendsymbol = selectedTicker.replace('.US', '');
+      
+      const trendsymbol = selectedTicker?.replace('.US', '') || '';
 
       if (!trendsymbol || !stockData) return;
       
