@@ -350,7 +350,7 @@ const RightPanel: React.FC<RightPanelProps> = ({ selectedCompany, selectedTicker
             Ticker: selectedTicker,
             "Market Capitalization": eodhdData["Highlights::MarketCapitalization"],
             Sector: eodhdData["General::Sector"] || "N/A",
-            Rating: eodhdData["AnalystRatings::Rating"] || "N/A",
+            Rating: "N/A", // Inicializar como N/A, se actualizará con el portfolio trend
             "Rated On": "Not rated",
             Price: currentPrice,
             eodhd: eodhdData,
@@ -387,9 +387,12 @@ const RightPanel: React.FC<RightPanelProps> = ({ selectedCompany, selectedTicker
     let isMounted = true;
     
     const fetchPortfolioTrend = async () => {
-      if (!selectedTicker || !stockData) return;
+      const trendsymbol = selectedTicker.replace('.US', '');
+
+      if (!trendsymbol || !stockData) return;
       
       try {
+        console.log('Fetching portfolio trend for:', selectedTicker);
         const response = await fetch('/portfolio_trend.json');
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
@@ -398,31 +401,58 @@ const RightPanel: React.FC<RightPanelProps> = ({ selectedCompany, selectedTicker
         if (!isMounted) return;
 
         const text = await response.text();
+        console.log('Raw response:', text);
         const cleanText = text.replace(/^\uFEFF/, '').trim();
         const sanitizedText = cleanText.replace(/: NaN/g, ': null');
         const data = JSON.parse(sanitizedText);
 
-        const stockTrend = data.find((item: any) => item.Ticker === selectedTicker);
+        console.log('All portfolio data:', data);
+        console.log('Looking for ticker:', selectedTicker);
+        
+        // Buscar el ticker exacto
+        const stockTrend = data.find((item: any) => {
+          console.log('Comparing with:', item.Ticker);
+          return item.Ticker === selectedTicker;
+        });
+
+        console.log('Found stock trend:', stockTrend);
+
         if (stockTrend && isMounted) {
+          console.log('Updating with stock trend data:', {
+            Rating: stockTrend.Rating,
+            "Rated On": stockTrend["Rated On"],
+            "Since Rated": stockTrend["Since Rated"],
+            "Smart Momentum": stockTrend["Smart Momentum"],
+            Retracement: stockTrend.Retracement,
+            "Trend Strength": stockTrend["Trend Strength"]
+          });
+
           setStockData(prevData => {
             if (!prevData) return prevData;
 
             const updatedData = {
               ...prevData,
-              Rating: String(stockTrend.Rating || "N/A"),
-              "Rated On": stockTrend["Rated On"] ? String(stockTrend["Rated On"]) : "Not rated",
-              "Since Rated": String(stockTrend["Since Rated"] || "0%"),
-              "Smart Momentum": Number(stockTrend["Smart Momentum"] || 0),
-              Retracement: String(stockTrend.Retracement || "0%"),
-              "Trend Strength": Number(stockTrend["Trend Strength"] || 0)
+              Rating: stockTrend.Rating,
+              "Rated On": stockTrend["Rated On"],
+              "Since Rated": stockTrend["Since Rated"],
+              "Smart Momentum": Number(stockTrend["Smart Momentum"]),
+              Retracement: stockTrend.Retracement,
+              "Trend Strength": Number(stockTrend["Trend Strength"])
             };
+            
+            console.log('Previous data:', prevData);
+            console.log('Updated data:', updatedData);
             
             // Solo actualizar si hay cambios reales
             if (JSON.stringify(prevData) === JSON.stringify(updatedData)) {
+              console.log('No changes detected, keeping previous data');
               return prevData;
             }
+            console.log('Changes detected, updating data');
             return updatedData;
           });
+        } else {
+          console.log('No stock trend found for ticker:', selectedTicker);
         }
       } catch (error) {
         console.error('Error processing portfolio trend:', error);
@@ -438,7 +468,7 @@ const RightPanel: React.FC<RightPanelProps> = ({ selectedCompany, selectedTicker
       isMounted = false;
       clearInterval(intervalId);
     };
-  }, [selectedTicker]); // Solo depende de selectedTicker
+  }, [selectedTicker]);
 
   const getRatingBackground = (rating: string | number | undefined) => {
     if (!rating || rating === 'N/A') return 'from-gray-500/5 border-gray-500/30';
