@@ -412,7 +412,6 @@ const RightPanel: React.FC<RightPanelProps> = ({ selectedCompany, selectedTicker
         await fetchDailyPriceData(selectedTicker);
 
         const currentPrice = priceData?.close || 0;
-        // const market = getMarketForSymbol(selectedTicker);
         
         if (eodhdData) {
           const newStockData: StockData = {
@@ -423,34 +422,10 @@ const RightPanel: React.FC<RightPanelProps> = ({ selectedCompany, selectedTicker
             "Rated On": "Not rated",
             Price: currentPrice,
             eodhd: eodhdData,
-            // market: market,
             recommendation: recommendation.recommendation,
             explanation: recommendation.explanation
           };
           
-          setStockData(newStockData);
-        } else {
-          // Fallback to the old method if EODHD fails
-          const updateSuccess = await updateCompanyData(selectedTicker);
-          if (!updateSuccess) {
-            throw new Error('Failed to update company data');
-          }
-          
-          const companyData = await getCompanyData(selectedTicker);
-          
-          const newStockData: StockData = {
-            Ticker: selectedTicker,
-            "Market Capitalization": companyData.MarketCapitalization || "N/A",
-            Sector: companyData.Sector || "N/A",
-            Rating: "N/A",
-            "Rated On": "Not rated",
-            Price: currentPrice || companyData["50DayMovingAverage"] || "N/A",
-            overview: companyData,
-            // market: market,
-            recommendation: recommendation.recommendation,
-            explanation: recommendation.explanation
-          };
-        
           setStockData(newStockData);
         }
       } catch (error) {
@@ -459,9 +434,9 @@ const RightPanel: React.FC<RightPanelProps> = ({ selectedCompany, selectedTicker
         setIsLoading(false);
       }
     };
-    
+
     fetchData();
-  }, [selectedTicker]);
+  }, [selectedTicker]); // Solo depende de selectedTicker
 
   // Update portfolio trend less frequently
   useEffect(() => {
