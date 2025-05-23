@@ -324,75 +324,6 @@ const RightPanel: React.FC<RightPanelProps> = ({ selectedCompany, selectedTicker
     }
   };
 
-  // Add new function to fetch daily prices
-  const fetchDailyPriceData = async (symbol: string) => {
-    try {
-      // Get market info and format symbol correctly
-      // const market = getMarketForSymbol(symbol);
-      const formattedSymbol = symbol;
-
-      // Get dates for last 3 years
-      const endDate = new Date();
-      const startDate = new Date();
-      startDate.setFullYear(startDate.getFullYear() - 3);
-
-      const fromDate = startDate.toISOString().split('T')[0];
-      const toDate = endDate.toISOString().split('T')[0];
-
-      const response = await fetch(
-        `https://eodhd.com/api/eod/${formattedSymbol}?from=${fromDate}&to=${toDate}&api_token=${EODHD_API_KEY}&fmt=json`
-      );
-
-      console.log(`https://eodhd.com/api/eod/${formattedSymbol}?from=${fromDate}&to=${toDate}&api_token=${EODHD_API_KEY}&fmt=json`)
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const data = await response.json();
-      
-      // Sort data by date (newest first)
-      const sortedData = data.sort((a: any, b: any) => 
-        new Date(b.date).getTime() - new Date(a.date).getTime()
-      );
-
-      setStockData(prevData => ({
-        ...prevData,
-        Ticker: symbol,
-        "Market Capitalization": sortedData[0]["Market Capitalization"],
-        Sector: sortedData[0].sector,
-        Rating: sortedData[0].rating,
-        "Rated On": "Not rated",
-        Price: sortedData[0].close,
-        eodhd: {
-          "General::Code": sortedData[0].symbol,
-          "General::Sector": sortedData[0].sector,
-          "Highlights::MarketCapitalization": sortedData[0]["Market Capitalization"],
-          "Valuation::TrailingPE": sortedData[0].trailing_pe,
-          "Valuation::PriceBookMRQ": sortedData[0].price_book_mrq,
-          "SplitsDividends::ForwardAnnualDividendYield": sortedData[0].dividend_yield,
-          "Technicals::Beta": sortedData[0].beta,
-          "Highlights::ReturnOnAssetsTTM": sortedData[0].return_on_assets_ttm,
-          "Highlights::ReturnOnEquityTTM": sortedData[0].return_on_equity_ttm,
-          "AnalystRatings::TargetPrice": sortedData[0].target_price,
-          "SplitsDividends::ExDividendDate": sortedData[0].ex_dividend_date,
-          "AnalystRatings::Rating": sortedData[0].rating,
-          "AnalystRatings::StrongBuy": sortedData[0].analyst_strong_buy,
-          "AnalystRatings::Buy": sortedData[0].analyst_buy,
-          "AnalystRatings::Hold": sortedData[0].analyst_hold,
-          "AnalystRatings::Sell": sortedData[0].analyst_sell,
-          "AnalystRatings::StrongSell": sortedData[0].analyst_strong_sell,
-          "Highlights::EPS": sortedData[0].eps,
-          "Highlights::52WeekHigh": sortedData[0]["52WeekHigh"],
-          "Highlights::52WeekLow": sortedData[0]["52WeekLow"]
-        },
-        // market: market,
-        recommendation: sortedData[0].recommendation as AIRecommendation || null
-      }));
-    } catch (error) {
-      console.error('Error fetching daily price data:', error);
-    }
-  };
-
   useEffect(() => {
     console.log('=== STARTING DATA FETCH ===', selectedTicker);
     const fetchData = async () => {
@@ -407,9 +338,6 @@ const RightPanel: React.FC<RightPanelProps> = ({ selectedCompany, selectedTicker
           fetchCompanyDataFromEODHD(selectedTicker),
           fetchDailyPrices(selectedTicker)
         ]);
-
-        // Fetch daily price data for the chart
-        await fetchDailyPriceData(selectedTicker);
 
         const currentPrice = priceData?.close || 0;
         
@@ -438,10 +366,10 @@ const RightPanel: React.FC<RightPanelProps> = ({ selectedCompany, selectedTicker
     fetchData();
   }, [selectedTicker]); // Solo depende de selectedTicker
 
-  // Update portfolio trend less frequently
+  // Modificar el useEffect de portfolio trend para que no cause actualizaciones innecesarias
   useEffect(() => {
     const fetchPortfolioTrend = async () => {
-      if (!selectedTicker) return;
+      if (!selectedTicker || !stockData) return;
       
       try {
         const response = await fetch('/portfolio_trend.json');
@@ -455,8 +383,8 @@ const RightPanel: React.FC<RightPanelProps> = ({ selectedCompany, selectedTicker
         const data = JSON.parse(sanitizedText);
 
         const stockTrend = data.find((item: any) => item.Ticker === selectedTicker);
-        if (stockTrend && stockData) {
-          setStockData({
+        if (stockTrend) {
+          const updatedData = {
             ...stockData,
             Rating: String(stockTrend.Rating || "N/A"),
             "Rated On": stockTrend["Rated On"] ? String(stockTrend["Rated On"]) : "Not rated",
@@ -464,7 +392,12 @@ const RightPanel: React.FC<RightPanelProps> = ({ selectedCompany, selectedTicker
             "Smart Momentum": Number(stockTrend["Smart Momentum"] || 0),
             Retracement: String(stockTrend.Retracement || "0%"),
             "Trend Strength": Number(stockTrend["Trend Strength"] || 0)
-          });
+          };
+          
+          // Solo actualizar si hay cambios reales
+          if (JSON.stringify(updatedData) !== JSON.stringify(stockData)) {
+            setStockData(updatedData);
+          }
         }
       } catch (error) {
         console.error('Error processing portfolio trend:', error);
@@ -477,7 +410,7 @@ const RightPanel: React.FC<RightPanelProps> = ({ selectedCompany, selectedTicker
     const intervalId = setInterval(fetchPortfolioTrend, 5 * 60 * 1000);
 
     return () => clearInterval(intervalId);
-  }, [selectedTicker, stockData]);
+  }, [selectedTicker, stockData?.Ticker]); // Solo depende del ticker y el ticker del stockData
 
   const getRatingBackground = (rating: string | number | undefined) => {
     if (!rating || rating === 'N/A') return 'from-gray-500/5 border-gray-500/30';
