@@ -97,7 +97,9 @@ export const searchReports = async (type: 'quarter' | 'research' = 'quarter') =>
     
     // Determinar la tabla y el bucket según el tipo
     const table = type === 'quarter' ? 'market_reports' : 'research_reports';
-    const bucket = type === 'quarter' ? 'marketreports' : 'reports';
+    const bucket = 'research'; // Siempre usar el bucket 'research'
+
+    console.log('Using table:', table, 'and bucket:', bucket);
 
     // Obtener los reportes de la tabla
     const { data: reports, error: tableError } = await supabase
@@ -107,58 +109,107 @@ export const searchReports = async (type: 'quarter' | 'research' = 'quarter') =>
 
     if (tableError) {
       console.error('Error fetching from table:', tableError);
+      if (tableError.code === '42501' || tableError.code === '403') {
+        console.error('Permission denied. Please check table policies in Supabase.');
+        return [];
+      }
       throw tableError;
     }
+
+    console.log('Reports from table:', reports);
 
     // Si no hay reportes en la tabla, intentar obtenerlos del bucket
     if (!reports || reports.length === 0) {
       console.log('No reports in table, checking bucket:', bucket);
+      
+      // Listar archivos del bucket
       const { data: files, error: listError } = await supabase.storage
         .from(bucket)
         .list();
 
       if (listError) {
         console.error('Error listing files from bucket:', listError);
+        if (listError.statusCode === 403) {
+          console.error('Permission denied. Please check bucket policies in Supabase.');
+          return [];
+        }
         throw listError;
+      }
+
+      console.log('Files found in bucket:', files);
+
+      if (!files || files.length === 0) {
+        console.log('No files found in bucket');
+        return [];
       }
 
       // Procesar los archivos del bucket
       const processedReports = await Promise.all(
         files.map(async (file) => {
-          const { data: { publicUrl } } = supabase.storage
-            .from(bucket)
-            .getPublicUrl(file.name);
+          try {
+            if (file.name === '.emptyFolderPlaceholder') {
+              console.log('Skipping empty folder placeholder');
+              return null;
+            }
 
-          const stockSymbol = extractStockSymbol(file.name);
-          const reportType = determineReportType(file.name);
-          const title = file.name.replace(/\.[^/.]+$/, "");
-          const description = `Report for ${stockSymbol} - ${reportType} analysis`;
+            console.log('Processing file:', file.name);
+            
+            // Obtener URL pública
+            const { data: { publicUrl } } = supabase.storage
+              .from(bucket)
+              .getPublicUrl(file.name);
 
-          // Insertar en la tabla correspondiente
-          const { data: insertedReport, error: insertError } = await supabase
-            .from(table)
-            .insert([
-              {
-                title,
-                description,
-                stock_symbol: stockSymbol,
-                report_type: reportType,
-                file_url: publicUrl
+            console.log('Public URL:', publicUrl);
+
+            // Para reportes de investigación, usar el nombre del archivo como símbolo
+            const stockSymbol = file.name.replace(/\.[^/.]+$/, "");
+            const reportType = 'research';
+            const title = file.name.replace(/\.[^/.]+$/, "");
+            const description = `Research Report for ${title}`;
+
+            console.log('Creating report with data:', {
+              title,
+              description,
+              stock_symbol: stockSymbol,
+              report_type: reportType,
+              file_url: publicUrl
+            });
+
+            // Insertar en la tabla correspondiente
+            const { data: insertedReport, error: insertError } = await supabase
+              .from(table)
+              .insert([
+                {
+                  title,
+                  description,
+                  stock_symbol: stockSymbol,
+                  report_type: reportType,
+                  file_url: publicUrl
+                }
+              ])
+              .select()
+              .single();
+
+            if (insertError) {
+              console.error(`Error inserting file ${file.name}:`, insertError);
+              if (insertError.code === '42501' || insertError.code === '403') {
+                console.error('Permission denied. Please check table policies in Supabase.');
               }
-            ])
-            .select()
-            .single();
+              return null;
+            }
 
-          if (insertError) {
-            console.error(`Error inserting file ${file.name}:`, insertError);
+            console.log('Successfully inserted report:', insertedReport);
+            return insertedReport;
+          } catch (error) {
+            console.error(`Error processing file ${file.name}:`, error);
             return null;
           }
-
-          return insertedReport;
         })
       );
 
-      return processedReports.filter(report => report !== null);
+      const validReports = processedReports.filter(report => report !== null);
+      console.log('Final processed reports:', validReports);
+      return validReports;
     }
 
     return reports;
@@ -173,14 +224,20 @@ export const uploadReport = async (file: File, reportData: Omit<MarketReport, 'i
     const fileExt = file.name.split('.').pop();
     const fileName = `${Math.random()}.${fileExt}`;
     const filePath = `reports/${fileName}`;
-    const bucket = type === 'quarter' ? 'marketreports' : 'reports';
+    const bucket = 'research'; // Siempre usar el bucket 'research'
     const table = type === 'quarter' ? 'market_reports' : 'research_reports';
 
     const { error: uploadError } = await supabase.storage
       .from(bucket)
       .upload(filePath, file);
 
-    if (uploadError) throw uploadError;
+    if (uploadError) {
+      console.error('Error uploading file:', uploadError);
+      if (uploadError.statusCode === 403) {
+        console.error('Permission denied. Please check bucket policies in Supabase.');
+      }
+      throw uploadError;
+    }
 
     const { data: { publicUrl } } = supabase.storage
       .from(bucket)
@@ -196,7 +253,13 @@ export const uploadReport = async (file: File, reportData: Omit<MarketReport, 'i
       ])
       .select();
 
-    if (error) throw error;
+    if (error) {
+      console.error('Error inserting report:', error);
+      if (error.code === '42501' || error.code === '403') {
+        console.error('Permission denied. Please check table policies in Supabase.');
+      }
+      throw error;
+    }
     return data[0] as MarketReport;
   } catch (error) {
     console.error('Error uploading report:', error);
