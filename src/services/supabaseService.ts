@@ -91,39 +91,103 @@ export const processAllFiles = async () => {
   }
 };
 
-export const searchReports = async () => {
+export const searchReports = async (type: 'quarter' | 'research' = 'quarter') => {
   try {
-    const { data, error } = await supabase
-      .from('market_reports')
+    console.log('Searching reports of type:', type);
+    
+    // Determinar la tabla y el bucket según el tipo
+    const table = type === 'quarter' ? 'market_reports' : 'research_reports';
+    const bucket = type === 'quarter' ? 'marketreports' : 'reports';
+
+    // Obtener los reportes de la tabla
+    const { data: reports, error: tableError } = await supabase
+      .from(table)
       .select('*')
       .order('created_at', { ascending: false });
 
-    if (error) throw error;
-    return data || [];
+    if (tableError) {
+      console.error('Error fetching from table:', tableError);
+      throw tableError;
+    }
+
+    // Si no hay reportes en la tabla, intentar obtenerlos del bucket
+    if (!reports || reports.length === 0) {
+      console.log('No reports in table, checking bucket:', bucket);
+      const { data: files, error: listError } = await supabase.storage
+        .from(bucket)
+        .list();
+
+      if (listError) {
+        console.error('Error listing files from bucket:', listError);
+        throw listError;
+      }
+
+      // Procesar los archivos del bucket
+      const processedReports = await Promise.all(
+        files.map(async (file) => {
+          const { data: { publicUrl } } = supabase.storage
+            .from(bucket)
+            .getPublicUrl(file.name);
+
+          const stockSymbol = extractStockSymbol(file.name);
+          const reportType = determineReportType(file.name);
+          const title = file.name.replace(/\.[^/.]+$/, "");
+          const description = `Report for ${stockSymbol} - ${reportType} analysis`;
+
+          // Insertar en la tabla correspondiente
+          const { data: insertedReport, error: insertError } = await supabase
+            .from(table)
+            .insert([
+              {
+                title,
+                description,
+                stock_symbol: stockSymbol,
+                report_type: reportType,
+                file_url: publicUrl
+              }
+            ])
+            .select()
+            .single();
+
+          if (insertError) {
+            console.error(`Error inserting file ${file.name}:`, insertError);
+            return null;
+          }
+
+          return insertedReport;
+        })
+      );
+
+      return processedReports.filter(report => report !== null);
+    }
+
+    return reports;
   } catch (error) {
     console.error('Error searching reports:', error);
     throw error;
   }
 };
 
-export const uploadReport = async (file: File, reportData: Omit<MarketReport, 'id' | 'created_at' | 'file_url'>) => {
+export const uploadReport = async (file: File, reportData: Omit<MarketReport, 'id' | 'created_at' | 'file_url'>, type: 'quarter' | 'research' = 'quarter') => {
   try {
     const fileExt = file.name.split('.').pop();
     const fileName = `${Math.random()}.${fileExt}`;
     const filePath = `reports/${fileName}`;
+    const bucket = type === 'quarter' ? 'marketreports' : 'reports';
+    const table = type === 'quarter' ? 'market_reports' : 'research_reports';
 
     const { error: uploadError } = await supabase.storage
-      .from('marketreports')
+      .from(bucket)
       .upload(filePath, file);
 
     if (uploadError) throw uploadError;
 
     const { data: { publicUrl } } = supabase.storage
-      .from('marketreports')
+      .from(bucket)
       .getPublicUrl(filePath);
 
     const { data, error } = await supabase
-      .from('market_reports')
+      .from(table)
       .insert([
         {
           ...reportData,

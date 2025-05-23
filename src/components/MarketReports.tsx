@@ -24,31 +24,45 @@ const MarketReports: React.FC<MarketReportsProps> = ({ searchQuery, onSearchChan
   const [selectedReport, setSelectedReport] = useState<Report | null>(null);
   const [allReports, setAllReports] = useState<Report[]>([]);
   const [selectedLetter, setSelectedLetter] = useState<string | null>(null);
+  const [selectedType, setSelectedType] = useState<'quarter' | 'research'>('quarter');
 
   const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
 
   const fetchReports = async () => {
     setIsLoading(true);
     setError(null);
+    console.log('Fetching reports of type:', selectedType);
 
     try {
-      const results = await searchReports();
-      console.log('Fetched all reports:', results);
-      setAllReports(results);
-      setReports(results);
+      const results = await searchReports(selectedType);
+      console.log('Fetched reports:', results);
+      
+      if (!results || results.length === 0) {
+        console.log('No reports found for type:', selectedType);
+        setAllReports([]);
+        setReports([]);
+      } else {
+        console.log('Setting reports:', results);
+        setAllReports(results);
+        setReports(results);
+      }
     } catch (err) {
       console.error('Error fetching reports:', err);
       setError('Error loading reports. Please try again.');
+      setAllReports([]);
+      setReports([]);
     } finally {
       setIsLoading(false);
     }
   };
 
   useEffect(() => {
+    console.log('Selected type changed to:', selectedType);
     fetchReports();
-  }, []);
+  }, [selectedType]);
 
   useEffect(() => {
+    console.log('Filtering reports. Search query:', searchQuery, 'Selected letter:', selectedLetter);
     let filteredResults = [...allReports];
 
     // Aplicar filtro alfabético si hay una letra seleccionada
@@ -87,10 +101,12 @@ const MarketReports: React.FC<MarketReportsProps> = ({ searchQuery, onSearchChan
       });
     }
 
+    console.log('Filtered results:', filteredResults);
     setReports(filteredResults);
   }, [searchQuery, allReports, selectedLetter]);
 
   const handleReportClick = (report: Report) => {
+    console.log('Report clicked:', report);
     setSelectedReport(report);
   };
 
@@ -103,6 +119,13 @@ const MarketReports: React.FC<MarketReportsProps> = ({ searchQuery, onSearchChan
     setSelectedLetter(selectedLetter === letter ? null : letter);
   };
 
+  const handleTypeChange = (type: 'quarter' | 'research') => {
+    console.log('Changing type to:', type);
+    setSelectedType(type);
+    setSelectedLetter(null); // Reset letter filter when changing type
+    setSelectedReport(null); // Reset selected report when changing type
+  };
+
   return (
     <div className="flex flex-1 gap-4 p-4 overflow-hidden">
       <div className="flex-1 flex flex-col gap-4 overflow-hidden">
@@ -113,6 +136,28 @@ const MarketReports: React.FC<MarketReportsProps> = ({ searchQuery, onSearchChan
               <p className="text-sm text-[#b9d6ee]/70 mt-1">
                 {reports.length} reports available
               </p>
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => handleTypeChange('quarter')}
+                className={`px-4 py-2 rounded-lg transition-colors ${
+                  selectedType === 'quarter'
+                    ? 'bg-[#b9d6ee] text-black'
+                    : 'bg-[#b9d6ee]/10 text-[#b9d6ee] hover:bg-[#b9d6ee]/20'
+                }`}
+              >
+                Quarter Reports
+              </button>
+              <button
+                onClick={() => handleTypeChange('research')}
+                className={`px-4 py-2 rounded-lg transition-colors ${
+                  selectedType === 'research'
+                    ? 'bg-[#b9d6ee] text-black'
+                    : 'bg-[#b9d6ee]/10 text-[#b9d6ee] hover:bg-[#b9d6ee]/20'
+                }`}
+              >
+                Research
+              </button>
             </div>
           </div>
 
