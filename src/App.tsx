@@ -4,7 +4,7 @@ import Login from './pages/Login';
 import Register from './pages/Register';
 import { supabase } from './lib/supabaseClient';
 import { useState, useEffect } from 'react';
-import { Download } from 'lucide-react';
+import { Download, Search } from 'lucide-react';
 import RightPanel from './components/RightPanel';
 import { updateData, getLastUpdateTime } from './services/dataService';
 import { toast } from 'react-toastify';
@@ -14,13 +14,17 @@ import { updateCompanyData } from './services/companyService';
 import AIAssistant from './components/AIAssistant';
 import MarketReports from './components/MarketReports';
 import StockTicker from './components/StockTicker';
+import stockTickers from './lib/Lookup';
+import { createPortal } from 'react-dom';
+
+type Market = 'US' | 'XETRA' | 'LSE' | 'TSX' | 'TSXV' | 'BSE' | 'SSE' | 'SZSE' | 'MX';
 
 interface StockData {
   symbol: string;
   name: string;
-  market: 'US' | 'XETRA' | 'LSE' | 'TSX' | 'TSXV' | 'BSE' | 'SSE' | 'SZSE' | 'MX';
-  change?: number;
+  market: Market;
   price?: number;
+  change?: number;
   loading?: boolean;
   error?: string;
 }
@@ -39,78 +43,6 @@ interface EODHDResponse {
   change: number | any;
   change_p: number | any;
 }
-
-const stockTickers: StockData[] = [
-  // US Stocks (NYSE/NASDAQ)
-  { symbol: 'IBM', name: 'International Business Machines Corporation', market: 'US' },
-  { symbol: 'MSFT', name: 'Microsoft Corporation', market: 'US' },
-  { symbol: 'AMZN', name: 'Amazon.com Inc.', market: 'US' },
-  { symbol: 'GOOGL', name: 'Alphabet Inc.', market: 'US' },
-  { symbol: 'META', name: 'Meta Platforms Inc.', market: 'US' },
-  { symbol: 'BRKB.BA', name: 'Berkshire Hathaway Inc.', market: 'US' },
-  { symbol: 'SPY', name: 'SPDR S&P 500 ETF Trust', market: 'US' },
-  { symbol: 'TCEHY', name: 'Tencent Holdings Ltd.', market: 'US' },
-  { symbol: 'BABA', name: 'Alibaba Group Holding Ltd.', market: 'US' },
-  { symbol: 'LVMUY', name: 'LVMH Moët Hennessy Louis Vuitton', market: 'US' },
-  { symbol: 'UBER', name: 'Uber Technologies Inc.', market: 'US' },
-  { symbol: 'RTX', name: 'Raytheon Technologies Corporation', market: 'US' },
-  { symbol: 'LMT', name: 'Lockheed Martin Corporation', market: 'US' },
-  { symbol: 'INTC', name: 'Intel Corporation', market: 'US' },
-  { symbol: 'ABNB', name: 'Airbnb Inc.', market: 'US' },
-  { symbol: 'RSP', name: 'Invesco S&P 500 Equal Weight ETF', market: 'US' },
-  { symbol: 'COIN', name: 'Coinbase Global Inc.', market: 'US' },
-  { symbol: 'TLT', name: 'iShares 20+ Year Treasury Bond ETF', market: 'US' },
-  { symbol: 'BIDU', name: 'Baidu Inc.', market: 'US' },
-  { symbol: 'EL', name: 'Estée Lauder Companies Inc.', market: 'US' },
-  { symbol: 'PINS', name: 'Pinterest Inc.', market: 'US' },
-  { symbol: 'PARA', name: 'Paramount Global', market: 'US' },
-  { symbol: 'QLD', name: 'ProShares Ultra QQQ', market: 'US' },
-  { symbol: 'DJT', name: 'DJT Corporation', market: 'US' },
-  { symbol: 'TMF', name: 'Direxion Daily 20+ Year Treasury Bull 3x Shares', market: 'US' },
-  { symbol: 'EWZ', name: 'iShares MSCI Brazil ETF', market: 'US' },
-  
-  // German Stocks (XETRA)
-  { symbol: 'MBG.XETRA', name: 'Mercedes-Benz Group AG', market: 'XETRA' },
-  { symbol: 'DHER.XETRA', name: 'Deutsche Börse AG', market: 'XETRA' },
-  { symbol: 'SMSN.IL', name: 'Siemens AG', market: 'XETRA' },
-  { symbol: 'POAHY.US', name: 'Porsche Automobil Holding SE', market: 'XETRA' },
-  { symbol: 'BMW.XETRA', name: 'BMW AG', market: 'XETRA' },
-  { symbol: 'SAP.XETRA', name: 'SAP SE', market: 'XETRA' },
-  
-  // UK Stocks (London Stock Exchange)
-  // { symbol: 'TSCO.LON', name: 'Tesco PLC', market: 'LSE' },
-  { symbol: 'BT-A.LON', name: 'BT Group plc', market: 'LSE' },
-  { symbol: 'HSBA.LSE', name: 'HSBC Holdings plc', market: 'LSE' },
-  { symbol: 'BP.LSE', name: 'BP p.l.c.', market: 'LSE' },
-  { symbol: 'VOD.LSE', name: 'Vodafone Group Plc', market: 'LSE' },
-  
-  // Canadian Stocks (Toronto Stock Exchange)
-  { symbol: 'SHOP.TRT', name: 'Shopify Inc.', market: 'TSX' },
-  { symbol: 'RY.TRT', name: 'Royal Bank of Canada', market: 'TSX' },
-  { symbol: 'TD.TRT', name: 'Toronto-Dominion Bank', market: 'TSX' },
-  { symbol: 'CNR.TRT', name: 'Canadian National Railway Company', market: 'TSX' },
-  
-  // Canadian Stocks (Toronto Venture Exchange)
-  { symbol: 'GPV.TRV', name: 'GreenPower Motor Company Inc.', market: 'TSXV' },
-  
-  // Indian Stocks (BSE)
-  { symbol: 'RELIANCE.NSE', name: 'Reliance Industries Limited', market: 'BSE' },
-  { symbol: 'TCS.NSE', name: 'Tata Consultancy Services Limited', market: 'BSE' },
-  { symbol: 'HDFCBANK.NSE', name: 'HDFC Bank Limited', market: 'BSE' },
-  { symbol: 'INFY.NSE', name: 'Infosys Limited', market: 'BSE' },
-  
-  // Chinese Stocks (Shanghai Stock Exchange)
-  { symbol: '600104.SHG', name: 'SAIC Motor Corporation Limited', market: 'SSE' },
-  { symbol: '601318.SHG', name: 'Ping An Insurance (Group) Company of China, Ltd.', market: 'SSE' },
-  { symbol: '600519.SHG', name: 'Kweichow Moutai Co., Ltd.', market: 'SSE' },
-  
-  // Chinese Stocks (Shenzhen Stock Exchange)
-  { symbol: '000002.SHE', name: 'China Vanke Co., Ltd.', market: 'SZSE' },
-  { symbol: '000651.SHE', name: 'Gree Electric Appliances Inc. of Zhuhai', market: 'SZSE' },
-  { symbol: '000333.SHE', name: 'Midea Group Co., Ltd.', market: 'SZSE' },
-
-  { symbol: 'FEMSAUB.MX', name: 'Grupo Femsa', market: 'MX' }
-];
 
 const PrivateRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [session, setSession] = React.useState<any>(null);
@@ -164,6 +96,39 @@ interface DashboardProps {
   setSearchQuery: (query: string) => void;
 }
 
+const SearchDropdown: React.FC<{
+  stocks: StockData[];
+  onSelect: (stock: StockData) => void;
+  position: { top: number; left: number; width: number };
+}> = ({ stocks, onSelect, position }) => {
+  return createPortal(
+    <div 
+      className="fixed z-[99999] bg-black/95 border border-[#b9d6ee]/20 rounded-lg shadow-lg max-h-60 overflow-y-auto"
+      style={{
+        top: position.top,
+        left: position.left,
+        width: position.width
+      }}
+    >
+      {stocks.length > 0 ? (
+        stocks.map((stock) => (
+          <div
+            key={stock.symbol}
+            onClick={() => onSelect(stock)}
+            className="px-4 py-2 hover:bg-[#b9d6ee]/10 cursor-pointer text-[#b9d6ee]"
+          >
+            <div className="font-semibold">{stock.symbol}</div>
+            <div className="text-sm text-[#b9d6ee]/70">{stock.name}</div>
+          </div>
+        ))
+      ) : (
+        <div className="px-4 py-2 text-[#b9d6ee]/70">No se encontraron resultados</div>
+      )}
+    </div>,
+    document.body
+  );
+};
+
 const Dashboard: React.FC<DashboardProps> = ({
   lastUpdate,
   handleUpdateData,
@@ -181,6 +146,36 @@ const Dashboard: React.FC<DashboardProps> = ({
   searchQuery,
   setSearchQuery
 }) => {
+  const [searchPosition, setSearchPosition] = useState({ top: 0, left: 0, width: 0 });
+  const searchInputRef = React.useRef<HTMLInputElement>(null);
+
+  const filteredStocks = stocks.filter(stock => 
+    stock.symbol.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    stock.name.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  const handleStockSelect = (stock: StockData) => {
+    setSearchQuery('');
+    handleStockClick(stock.symbol);
+  };
+
+  const updateSearchPosition = () => {
+    if (searchInputRef.current) {
+      const rect = searchInputRef.current.getBoundingClientRect();
+      setSearchPosition({
+        top: rect.bottom + window.scrollY,
+        left: rect.left + window.scrollX,
+        width: rect.width
+      });
+    }
+  };
+
+  useEffect(() => {
+    if (searchQuery) {
+      updateSearchPosition();
+    }
+  }, [searchQuery]);
+
   return (
     <div className="min-h-screen bg-gray-100">
       <ToastContainer position="top-right" autoClose={3000} />
@@ -218,6 +213,27 @@ const Dashboard: React.FC<DashboardProps> = ({
                   />
                 </svg>
               </button>
+              <div className="relative">
+                <input
+                  ref={searchInputRef}
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => {
+                    setSearchQuery(e.target.value);
+                  }}
+                  placeholder="Buscar acción..."
+                  className="w-64 px-4 py-2 bg-black/50 text-[#b9d6ee] rounded-lg border border-[#b9d6ee]/20 focus:outline-none focus:border-[#b9d6ee]/50 pl-10"
+                />
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-[#b9d6ee]" />
+              </div>
+              
+              {searchQuery && (
+                <SearchDropdown
+                  stocks={filteredStocks}
+                  onSelect={handleStockSelect}
+                  position={searchPosition}
+                />
+              )}
               <button
                 onClick={exportStockData}
                 disabled={isExporting}
@@ -311,7 +327,7 @@ const App: React.FC = () => {
       case 'SSE':
         return symbol.replace('.SHH', '.SS');
       case 'SZSE':
-        return symbol.replace('.SHG', '.SZ');
+        return symbol.replace('.SHG', '.SHE');
       case 'MX':
         return symbol.replace('.MX', '.MX');
       default:

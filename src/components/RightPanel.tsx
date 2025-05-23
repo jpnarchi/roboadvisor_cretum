@@ -5,6 +5,8 @@ import AIRecommendationPanel from './AIRecommendationPanel';
 import { AIRecommendation } from '../types/AIRecommendation';
 import StockChart from './StockChart';
 import html2pdf from 'html2pdf.js';
+import { filters } from '../lib/Lookup';
+
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -150,6 +152,7 @@ const dataCache = new Map<string, {
 }>();
 
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes in milliseconds
+const EODHD_API_KEY = "6824b2d80fe347.44604306";
 
 const RightPanel: React.FC<RightPanelProps> = ({ selectedCompany, selectedTicker }) => {
   const [stockData, setStockData] = useState<StockData | null>(null);
@@ -244,47 +247,25 @@ const RightPanel: React.FC<RightPanelProps> = ({ selectedCompany, selectedTicker
   // Updated function to fetch company data from EODHD API with caching
   const fetchCompanyDataFromEODHD = async (symbol: string): Promise<EODHDCompanyOverview | null> => {
     try {
-      const cleanSymbol = symbol.includes('.') 
-        ? `${symbol.split('.')[0]}.${symbol.split('.')[1] === 'BMV' ? 'MX' : 
-           symbol.split('.')[1] === 'DEX' ? 'DE' : 
-           symbol.split('.')[1] === 'LON' ? 'GB' : 
-           symbol.split('.')[1] === 'MIL' ? 'IT' : 'US'}`
-        : `${symbol}.US`;
+      // Get market info and format symbol correctly
+      // const market = getMarketForSymbol(symbol);
+      const formattedSymbol = symbol;
 
       // Check cache first
-      const cacheKey = `company_${cleanSymbol}`;
+      const cacheKey = `company_${formattedSymbol}`;
       const cachedData = dataCache.get(cacheKey);
       if (cachedData && Date.now() - cachedData.timestamp < CACHE_DURATION) {
-        console.log('Using cached company data for:', cleanSymbol);
+        console.log('Using cached company data for:', formattedSymbol);
         return cachedData.data;
       }
 
-      console.log(`Fetching company data from EODHD API for ${cleanSymbol}...`);
-      
-      const apiToken = "6824b2d80fe347.44604306";
-      const filters = [
-        "General::Code",
-        "General::Sector",
-        "Highlights::MarketCapitalization",
-        "Valuation::TrailingPE",
-        "Valuation::PriceBookMRQ",
-        "SplitsDividends::ForwardAnnualDividendYield",
-        "Technicals::Beta",
-        "Highlights::ReturnOnAssetsTTM",
-        "Highlights::ReturnOnEquityTTM",
-        "AnalystRatings::TargetPrice",
-        "SplitsDividends::ExDividendDate",
-        "AnalystRatings::Rating",
-        "AnalystRatings::StrongBuy",
-        "AnalystRatings::Buy",
-        "AnalystRatings::Hold",
-        "AnalystRatings::Sell",
-        "AnalystRatings::StrongSell"
-      ].join(",");
-      
+      console.log(`Fetching company data from EODHD API for ${formattedSymbol}...`);
+
       const response = await fetch(
-        `https://eodhd.com/api/fundamentals/${cleanSymbol}?filter=${filters}&api_token=${apiToken}&fmt=json`
+        `https://eodhd.com/api/fundamentals/${formattedSymbol}?filter=${filters}&api_token=${EODHD_API_KEY}&fmt=json`
       );
+
+      
       
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
@@ -301,31 +282,27 @@ const RightPanel: React.FC<RightPanelProps> = ({ selectedCompany, selectedTicker
       return data as EODHDCompanyOverview;
     } catch (error) {
       console.error(`Error fetching company data from EODHD API for ${symbol}:`, error);
-        return null;
-      }
+      return null;
+    }
   };
 
   // Updated function to fetch real-time prices with caching
   const fetchDailyPrices = async (ticker: string): Promise<{ close: number } | null> => {
     try {
-      const cleanSymbol = ticker.includes('.') 
-        ? `${ticker.split('.')[0]}.${ticker.split('.')[1] === 'BMV' ? 'MX' : 
-           ticker.split('.')[1] === 'DEX' ? 'DE' : 
-           ticker.split('.')[1] === 'LON' ? 'GB' : 
-           ticker.split('.')[1] === 'MIL' ? 'IT' : 'US'}`
-        : `${ticker}.US`;
+      // Get market info and format symbol correctly
+      // const market = getMarketForSymbol(ticker);
+      const formattedSymbol = ticker;
           
       // Check cache first
-      const cacheKey = `price_${cleanSymbol}`;
+      const cacheKey = `price_${formattedSymbol}`;
       const cachedData = dataCache.get(cacheKey);
       if (cachedData && Date.now() - cachedData.timestamp < 60000) { // 1 minute cache for prices
-        console.log('Using cached price data for:', cleanSymbol);
+        console.log('Using cached price data for:', formattedSymbol);
         return cachedData.data;
       }
 
-      const apiToken = "6824b2d80fe347.44604306";
       const response = await fetch(
-        `https://eodhd.com/api/real-time/${cleanSymbol}?api_token=${apiToken}&fmt=json`
+        `https://eodhd.com/api/real-time/${formattedSymbol}?api_token=${EODHD_API_KEY}&fmt=json`
       );
       
       if (!response.ok) {
@@ -350,12 +327,9 @@ const RightPanel: React.FC<RightPanelProps> = ({ selectedCompany, selectedTicker
   // Add new function to fetch daily prices
   const fetchDailyPriceData = async (symbol: string) => {
     try {
-      const cleanSymbol = symbol.includes('.') 
-        ? `${symbol.split('.')[0]}.${symbol.split('.')[1] === 'BMV' ? 'MX' : 
-           symbol.split('.')[1] === 'DEX' ? 'DE' : 
-           symbol.split('.')[1] === 'LON' ? 'GB' : 
-           symbol.split('.')[1] === 'MIL' ? 'IT' : 'US'}`
-        : `${symbol}.US`;
+      // Get market info and format symbol correctly
+      // const market = getMarketForSymbol(symbol);
+      const formattedSymbol = symbol;
 
       // Get dates for last 3 years
       const endDate = new Date();
@@ -365,11 +339,11 @@ const RightPanel: React.FC<RightPanelProps> = ({ selectedCompany, selectedTicker
       const fromDate = startDate.toISOString().split('T')[0];
       const toDate = endDate.toISOString().split('T')[0];
 
-      const apiToken = "6824b2d80fe347.44604306";
       const response = await fetch(
-        `https://eodhd.com/api/eod/${cleanSymbol}?from=${fromDate}&to=${toDate}&api_token=${apiToken}&fmt=json`
+        `https://eodhd.com/api/eod/${formattedSymbol}?from=${fromDate}&to=${toDate}&api_token=${EODHD_API_KEY}&fmt=json`
       );
 
+      console.log(`https://eodhd.com/api/eod/${formattedSymbol}?from=${fromDate}&to=${toDate}&api_token=${EODHD_API_KEY}&fmt=json`)
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
@@ -411,7 +385,7 @@ const RightPanel: React.FC<RightPanelProps> = ({ selectedCompany, selectedTicker
           "Highlights::52WeekHigh": sortedData[0]["52WeekHigh"],
           "Highlights::52WeekLow": sortedData[0]["52WeekLow"]
         },
-        market: sortedData[0].market,
+        // market: market,
         recommendation: sortedData[0].recommendation as AIRecommendation || null
       }));
     } catch (error) {
@@ -420,6 +394,7 @@ const RightPanel: React.FC<RightPanelProps> = ({ selectedCompany, selectedTicker
   };
 
   useEffect(() => {
+    console.log('=== STARTING DATA FETCH ===', selectedTicker);
     const fetchData = async () => {
       if (!selectedTicker) return;
       
@@ -437,6 +412,7 @@ const RightPanel: React.FC<RightPanelProps> = ({ selectedCompany, selectedTicker
         await fetchDailyPriceData(selectedTicker);
 
         const currentPrice = priceData?.close || 0;
+        // const market = getMarketForSymbol(selectedTicker);
         
         if (eodhdData) {
           const newStockData: StockData = {
@@ -447,10 +423,7 @@ const RightPanel: React.FC<RightPanelProps> = ({ selectedCompany, selectedTicker
             "Rated On": "Not rated",
             Price: currentPrice,
             eodhd: eodhdData,
-            market: selectedTicker.includes('.BMV') ? 'Mexico' :
-                    selectedTicker.includes('.DEX') ? 'XETRA' :
-                    selectedTicker.includes('.LON') ? 'LSE' :
-                    selectedTicker.includes('.MIL') ? 'Milan' : 'US',
+            // market: market,
             recommendation: recommendation.recommendation,
             explanation: recommendation.explanation
           };
@@ -463,7 +436,7 @@ const RightPanel: React.FC<RightPanelProps> = ({ selectedCompany, selectedTicker
             throw new Error('Failed to update company data');
           }
           
-        const companyData = await getCompanyData(selectedTicker);
+          const companyData = await getCompanyData(selectedTicker);
           
           const newStockData: StockData = {
             Ticker: selectedTicker,
@@ -473,10 +446,7 @@ const RightPanel: React.FC<RightPanelProps> = ({ selectedCompany, selectedTicker
             "Rated On": "Not rated",
             Price: currentPrice || companyData["50DayMovingAverage"] || "N/A",
             overview: companyData,
-            market: selectedTicker.includes('.BMV') ? 'Mexico' :
-                    selectedTicker.includes('.DEX') ? 'XETRA' :
-                    selectedTicker.includes('.LON') ? 'LSE' :
-                    selectedTicker.includes('.MIL') ? 'Milan' : 'US',
+            // market: market,
             recommendation: recommendation.recommendation,
             explanation: recommendation.explanation
           };
@@ -576,7 +546,7 @@ const RightPanel: React.FC<RightPanelProps> = ({ selectedCompany, selectedTicker
     if (value === undefined || value === null || value === 'None' || value === '') return 'N/A';
     const num = typeof value === 'string' ? parseFloat(value) : value;
     if (isNaN(num)) return 'N/A';
-    return `$${num.toLocaleString('en-US', { maximumFractionDigits: 2 })}`;
+    return `${num.toLocaleString('en-US', { maximumFractionDigits: 2 })}`;
   };
 
   // Remove unused variables
@@ -615,7 +585,7 @@ const RightPanel: React.FC<RightPanelProps> = ({ selectedCompany, selectedTicker
               <div className="flex items-center justify-between w-full">
                 <div className="flex items-center gap-3 mb-2">
                   <h2 className="text-4xl font-extrabold tracking-tight bg-gradient-to-r text-white bg-clip-text text-transparent">{selectedCompany}</h2>
-                {selectedTicker && (
+                  {selectedTicker && (
                     <div className="flex items-center gap-2">
                       <span className="text-lg font-bold text-[#b9d6ee] bg-[#b9d6ee]/5 px-4 py-1.5 rounded-lg border border-[#b9d6ee]/20 shadow-glow">
                         ({selectedTicker})
@@ -624,7 +594,7 @@ const RightPanel: React.FC<RightPanelProps> = ({ selectedCompany, selectedTicker
                         <span className="text-sm font-medium text-[#b9d6ee]/70 bg-[#b9d6ee]/5 px-2 py-1 rounded border border-[#b9d6ee]/20">
                           {stockData.market}
                         </span>
-                )}
+                      )}
                     </div>
                   )}
                 </div>
@@ -642,14 +612,14 @@ const RightPanel: React.FC<RightPanelProps> = ({ selectedCompany, selectedTicker
                 {stockData?.eodhd ? stockData.eodhd["General::Sector"] : (stockData?.overview?.Sector || 'Sector not available')}
               </p>
             </div>
-              </div>
+          </div>
               
-              {isLoading ? (
-                <div className="flex items-center justify-center h-32">
-                  <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-[#b9d6ee]"></div>
-                </div>
+          {isLoading ? (
+            <div className="flex items-center justify-center h-32">
+              <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-[#b9d6ee]"></div>
+            </div>
           ) : stockData && (
-                <>
+            <>
               <div className="mt-4 grid grid-cols-4 gap-6 w-full">
                 <div className="glass-panel p-4 rounded-xl border border-[#b9d6ee]/10 bg-gradient-to-br from-[#b9d6ee]/5 to-transparent backdrop-blur-lg shadow-glow">
                   <span className="text-sm uppercase tracking-wider text-[#b9d6ee]/70 font-medium">Price</span>
@@ -699,8 +669,8 @@ const RightPanel: React.FC<RightPanelProps> = ({ selectedCompany, selectedTicker
                       <span className="text-sm text-[#b9d6ee]/70 font-medium">Beta</span>
                       <p className="text-2xl font-bold text-white mt-1">{formatNumber(beta)}</p>
                     </div>
-                    </div>
                   </div>
+                </div>
 
                 <div className="glass-panel p-6 rounded-xl border border-[#b9d6ee]/10 bg-gradient-to-br from-[#b9d6ee]/5 to-transparent backdrop-blur-lg shadow-glow">
                   <h3 className="text-lg font-semibold mb-6 text-[#b9d6ee] flex items-center">
@@ -708,24 +678,24 @@ const RightPanel: React.FC<RightPanelProps> = ({ selectedCompany, selectedTicker
                     <div className="h-px flex-1 bg-gradient-to-r from-[#b9d6ee]/20 to-transparent"></div>
                   </h3>
                   <div className="grid grid-cols-2 gap-6">
-                        <div>
+                    <div>
                       <span className="text-sm text-[#b9d6ee]/70 font-medium">ROA</span>
                       <p className="text-2xl font-bold text-white mt-1">{formatPercentage(stockData.eodhd ? stockData.eodhd["Highlights::ReturnOnAssetsTTM"] : stockData.overview?.ReturnOnAssetsTTM)}</p>
-                        </div>
-                        <div>
+                    </div>
+                    <div>
                       <span className="text-sm text-[#b9d6ee]/70 font-medium">ROE</span>
                       <p className="text-2xl font-bold text-white mt-1">{formatPercentage(stockData.eodhd ? stockData.eodhd["Highlights::ReturnOnEquityTTM"] : stockData.overview?.ReturnOnEquityTTM)}</p>
-                        </div>
-                        <div>
+                    </div>
+                    <div>
                       <span className="text-sm text-[#b9d6ee]/70 font-medium">Target Price</span>
                       <p className="text-2xl font-bold text-white mt-1">{formatCurrency(stockData.eodhd ? stockData.eodhd["AnalystRatings::TargetPrice"] : stockData.overview?.AnalystTargetPrice)}</p>
-                        </div>
-                        <div>
+                    </div>
+                    <div>
                       <span className="text-sm text-[#b9d6ee]/70 font-medium">Ex-Dividend</span>
                       <p className="text-2xl font-bold text-white mt-1">{stockData.eodhd ? stockData.eodhd["SplitsDividends::ExDividendDate"] : (stockData.overview?.ExDividendDate || 'N/A')}</p>
-                        </div>
-                      </div>
                     </div>
+                  </div>
+                </div>
 
                 <div className="glass-panel p-6 rounded-xl border border-[#b9d6ee]/10 bg-gradient-to-br from-[#b9d6ee]/5 to-transparent backdrop-blur-lg shadow-glow col-span-1 lg:col-span-2">
                   <h3 className="text-lg font-semibold mb-6 text-[#b9d6ee] flex items-center">
@@ -756,20 +726,20 @@ const RightPanel: React.FC<RightPanelProps> = ({ selectedCompany, selectedTicker
                                    parseInt(stockData.overview?.AnalystRatingHold || '0') + 
                                    parseInt(stockData.overview?.AnalystRatingSell || '0'))) * 100}%`
                           }}
-                            ></div>
-                          </div>
-                        </div>
+                        ></div>
+                      </div>
+                    </div>
                     <div className="flex-1 mx-8">
-                          <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center justify-between mb-2">
                         <span className="text-sm text-[#b9d6ee]/70 font-medium">Hold</span>
                         <span className="text-xl font-bold text-yellow-400">
                           {stockData.eodhd 
                             ? stockData.eodhd["AnalystRatings::Hold"] 
                             : (stockData.overview?.AnalystRatingHold || '0')}
                         </span>
-                          </div>
+                      </div>
                       <div className="h-2 bg-yellow-400/10 rounded-full overflow-hidden shadow-glow">
-                            <div 
+                        <div 
                           className="h-full bg-gradient-to-r from-yellow-400 to-yellow-300 rounded-full" 
                           style={{ 
                             width: stockData.eodhd 
@@ -782,20 +752,20 @@ const RightPanel: React.FC<RightPanelProps> = ({ selectedCompany, selectedTicker
                                    parseInt(stockData.overview?.AnalystRatingHold || '0') + 
                                    parseInt(stockData.overview?.AnalystRatingSell || '0'))) * 100}%`
                           }}
-                            ></div>
-                          </div>
-                        </div>
-                        <div className="flex-1">
-                          <div className="flex items-center justify-between mb-2">
+                        ></div>
+                      </div>
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex items-center justify-between mb-2">
                         <span className="text-sm text-[#b9d6ee]/70 font-medium">Sell</span>
                         <span className="text-xl font-bold text-red-400">
                           {stockData.eodhd 
                             ? (stockData.eodhd["AnalystRatings::Sell"] + stockData.eodhd["AnalystRatings::StrongSell"]) 
                             : (stockData.overview?.AnalystRatingSell || '0')}
                         </span>
-                          </div>
+                      </div>
                       <div className="h-2 bg-red-400/10 rounded-full overflow-hidden shadow-glow">
-                            <div 
+                        <div 
                           className="h-full bg-gradient-to-r from-red-400 to-red-300 rounded-full" 
                           style={{ 
                             width: stockData.eodhd 
@@ -808,11 +778,11 @@ const RightPanel: React.FC<RightPanelProps> = ({ selectedCompany, selectedTicker
                                    parseInt(stockData.overview?.AnalystRatingHold || '0') + 
                                    parseInt(stockData.overview?.AnalystRatingSell || '0'))) * 100}%`
                           }}
-                            ></div>
+                        ></div>
                       </div>
                     </div>
                   </div>
-            </div>
+                </div>
             
                 <div className="col-span-1 lg:col-span-2">
                   <AIRecommendationPanel 
@@ -835,7 +805,7 @@ const RightPanel: React.FC<RightPanelProps> = ({ selectedCompany, selectedTicker
                 <div className="h-64">
                   <StockChart symbol={selectedTicker} />
                 </div>
-            </div>
+              </div>
             </>
           )}
         </div>
@@ -846,6 +816,7 @@ const RightPanel: React.FC<RightPanelProps> = ({ selectedCompany, selectedTicker
       )}
     </div>
   );
+
 };
 
 export default RightPanel;

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, {memo} from 'react';
 import { AIRecommendation } from '../types/AIRecommendation';
 
 interface CompanyOverview {
@@ -188,4 +188,4 @@ const AIRecommendationPanel: React.FC<AIRecommendationPanelProps> = ({
   );
 };
 
-export default AIRecommendationPanel;
+export default memo(AIRecommendationPanel);
