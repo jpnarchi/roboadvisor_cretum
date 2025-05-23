@@ -324,8 +324,11 @@ const RightPanel: React.FC<RightPanelProps> = ({ selectedCompany, selectedTicker
     }
   };
 
+  // Modificar el useEffect principal para manejar todas las actualizaciones de estado
   useEffect(() => {
+    let isMounted = true;
     console.log('=== STARTING DATA FETCH ===', selectedTicker);
+    
     const fetchData = async () => {
       if (!selectedTicker) return;
       
@@ -338,6 +341,8 @@ const RightPanel: React.FC<RightPanelProps> = ({ selectedCompany, selectedTicker
           fetchCompanyDataFromEODHD(selectedTicker),
           fetchDailyPrices(selectedTicker)
         ]);
+
+        if (!isMounted) return;
 
         const currentPrice = priceData?.close || 0;
         
@@ -354,20 +359,34 @@ const RightPanel: React.FC<RightPanelProps> = ({ selectedCompany, selectedTicker
             explanation: recommendation.explanation
           };
           
-          setStockData(newStockData);
+          setStockData(prevData => {
+            // Solo actualizar si hay cambios reales
+            if (JSON.stringify(prevData) === JSON.stringify(newStockData)) {
+              return prevData;
+            }
+            return newStockData;
+          });
         }
       } catch (error) {
         console.error('Error fetching data:', error);
       } finally {
-        setIsLoading(false);
+        if (isMounted) {
+          setIsLoading(false);
+        }
       }
     };
 
     fetchData();
+
+    return () => {
+      isMounted = false;
+    };
   }, [selectedTicker]); // Solo depende de selectedTicker
 
-  // Modificar el useEffect de portfolio trend para que no cause actualizaciones innecesarias
+  // Modificar el useEffect de portfolio trend para que sea más controlado
   useEffect(() => {
+    let isMounted = true;
+    
     const fetchPortfolioTrend = async () => {
       if (!selectedTicker || !stockData) return;
       
@@ -377,27 +396,34 @@ const RightPanel: React.FC<RightPanelProps> = ({ selectedCompany, selectedTicker
           throw new Error(`HTTP error! status: ${response.status}`);
         }
 
+        if (!isMounted) return;
+
         const text = await response.text();
         const cleanText = text.replace(/^\uFEFF/, '').trim();
         const sanitizedText = cleanText.replace(/: NaN/g, ': null');
         const data = JSON.parse(sanitizedText);
 
         const stockTrend = data.find((item: any) => item.Ticker === selectedTicker);
-        if (stockTrend) {
-          const updatedData = {
-            ...stockData,
-            Rating: String(stockTrend.Rating || "N/A"),
-            "Rated On": stockTrend["Rated On"] ? String(stockTrend["Rated On"]) : "Not rated",
-            "Since Rated": String(stockTrend["Since Rated"] || "0%"),
-            "Smart Momentum": Number(stockTrend["Smart Momentum"] || 0),
-            Retracement: String(stockTrend.Retracement || "0%"),
-            "Trend Strength": Number(stockTrend["Trend Strength"] || 0)
-          };
-          
-          // Solo actualizar si hay cambios reales
-          if (JSON.stringify(updatedData) !== JSON.stringify(stockData)) {
-            setStockData(updatedData);
-          }
+        if (stockTrend && isMounted) {
+          setStockData(prevData => {
+            if (!prevData) return prevData;
+
+            const updatedData = {
+              ...prevData,
+              Rating: String(stockTrend.Rating || "N/A"),
+              "Rated On": stockTrend["Rated On"] ? String(stockTrend["Rated On"]) : "Not rated",
+              "Since Rated": String(stockTrend["Since Rated"] || "0%"),
+              "Smart Momentum": Number(stockTrend["Smart Momentum"] || 0),
+              Retracement: String(stockTrend.Retracement || "0%"),
+              "Trend Strength": Number(stockTrend["Trend Strength"] || 0)
+            };
+            
+            // Solo actualizar si hay cambios reales
+            if (JSON.stringify(prevData) === JSON.stringify(updatedData)) {
+              return prevData;
+            }
+            return updatedData;
+          });
         }
       } catch (error) {
         console.error('Error processing portfolio trend:', error);
@@ -409,8 +435,11 @@ const RightPanel: React.FC<RightPanelProps> = ({ selectedCompany, selectedTicker
     // Update portfolio trend every 5 minutes
     const intervalId = setInterval(fetchPortfolioTrend, 5 * 60 * 1000);
 
-    return () => clearInterval(intervalId);
-  }, [selectedTicker, stockData?.Ticker]); // Solo depende del ticker y el ticker del stockData
+    return () => {
+      isMounted = false;
+      clearInterval(intervalId);
+    };
+  }, [selectedTicker]); // Solo depende de selectedTicker
 
   const getRatingBackground = (rating: string | number | undefined) => {
     if (!rating || rating === 'N/A') return 'from-gray-500/5 border-gray-500/30';
