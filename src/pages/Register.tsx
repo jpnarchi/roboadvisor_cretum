@@ -9,12 +9,14 @@ const Register: React.FC = () => {
   const [invitationCode, setInvitationCode] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState(false);
   const navigate = useNavigate();
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
+    setSuccess(false);
 
     try {
       // Verificar el código de invitación
@@ -55,6 +57,13 @@ const Register: React.FC = () => {
       // Esperar un momento para asegurar que el usuario se cree en auth.users
       await new Promise(resolve => setTimeout(resolve, 1000));
 
+      // Verificar que el usuario existe en auth.users
+      const { data: { user: authUser }, error: authUserError } = await supabase.auth.getUser();
+
+      if (authUserError || !authUser) {
+        throw new Error('Error al verificar el usuario en auth.users');
+      }
+
       // Obtener el ID del rol de usuario
       const { data: roleData, error: roleError } = await supabase
         .from('user_roles')
@@ -64,17 +73,6 @@ const Register: React.FC = () => {
 
       if (roleError || !roleData) {
         throw new Error('Error al obtener el rol de usuario');
-      }
-
-      // Verificar que el usuario existe en auth.users antes de crear el perfil
-      const { error: userCheckError } = await supabase
-        .from('users')
-        .select('id')
-        .eq('id', authData.user.id)
-        .single();
-
-      if (userCheckError && userCheckError.code !== 'PGRST116') {
-        throw new Error('Error al verificar el usuario');
       }
 
       // Crear el perfil del usuario
@@ -105,7 +103,11 @@ const Register: React.FC = () => {
         console.error('Error al actualizar el código de invitación:', updateError);
       }
 
-      navigate('/dashboard');
+      setSuccess(true);
+      // Esperar 3 segundos antes de redirigir
+      setTimeout(() => {
+        navigate('/dashboard');
+      }, 3000);
     } catch (error: any) {
       setError(error.message);
     } finally {
@@ -129,6 +131,13 @@ const Register: React.FC = () => {
           {error && (
             <div className="bg-red-500/10 border border-red-500/20 text-red-500 px-4 py-3 rounded-lg relative" role="alert">
               <span className="block sm:inline">{error}</span>
+            </div>
+          )}
+          {success && (
+            <div className="bg-green-500/10 border border-green-500/20 text-green-500 px-4 py-3 rounded-lg relative" role="alert">
+              <span className="block sm:inline">
+                ¡Registro exitoso! Por favor, verifica tu correo electrónico para activar tu cuenta. Serás redirigido en unos segundos...
+              </span>
             </div>
           )}
           <div className="space-y-4">
@@ -199,11 +208,13 @@ const Register: React.FC = () => {
           <div>
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || success}
               className="group relative w-full flex justify-center py-3 px-4 border border-transparent text-sm font-medium rounded-lg text-white bg-[#b9d6ee]/10 hover:bg-[#b9d6ee]/20 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#b9d6ee] disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
             >
               {loading ? (
                 <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-[#b9d6ee]"></div>
+              ) : success ? (
+                '¡Registro exitoso!'
               ) : (
                 'Registrarse'
               )}

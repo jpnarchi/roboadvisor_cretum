@@ -53,23 +53,23 @@ const StockChart: React.FC<StockChartProps> = ({ symbol }) => {
         setIsLoading(true);
         setError(null);
 
-        // const cleanSymbol = symbol.includes('.') 
-        //   ? `${symbol.split('.')[0]}.${
-        //       symbol.split('.')[1] === 'BMV' ? 'MX' :
-        //       symbol.split('.')[1] === 'DEX' ? 'DE' :
-        //       symbol.split('.')[1] === 'LON' ? 'GB' :
-        //       symbol.split('.')[1] === 'MIL' ? 'IT' :
-        //       symbol.split('.')[1] === 'XETRA' ? 'DE' :
-        //       symbol.split('.')[1] === 'LSE' ? 'GB' :
-        //       symbol.split('.')[1] === 'TRT' ? 'CA' :
-        //       symbol.split('.')[1] === 'TRV' ? 'CA' :
-        //       symbol.split('.')[1] === 'NSE' ? 'IN' :
-        //       symbol.split('.')[1] === 'SHG' ? 'CN' :
-        //       symbol.split('.')[1] === 'SHE' ? 'CN' :
-        //       symbol.split('.')[1] === 'MX' ? 'MX' :
-        //       'US'
-        //     }`
-        //   : `${symbol}.US`;
+        const cleanSymbol = symbol.includes('.') 
+          ? `${symbol.split('.')[0]}.${
+              symbol.split('.')[1] === 'BMV' ? 'MX' :
+              symbol.split('.')[1] === 'DEX' ? 'DE' :
+              symbol.split('.')[1] === 'LON' ? 'GB' :
+              symbol.split('.')[1] === 'MIL' ? 'IT' :
+              symbol.split('.')[1] === 'XETRA' ? 'DE' :
+              symbol.split('.')[1] === 'LSE' ? 'GB' :
+              symbol.split('.')[1] === 'TRT' ? 'CA' :
+              symbol.split('.')[1] === 'TRV' ? 'CA' :
+              symbol.split('.')[1] === 'NSE' ? 'IN' :
+              symbol.split('.')[1] === 'SHG' ? 'CN' :
+              symbol.split('.')[1] === 'SHE' ? 'CN' :
+              symbol.split('.')[1] === 'MX' ? 'MX' :
+              'US'
+            }`
+          : `${symbol}.US`;
 
         // Get dates for last year
         const endDate = new Date();
@@ -80,10 +80,10 @@ const StockChart: React.FC<StockChartProps> = ({ symbol }) => {
         const toDate = endDate.toISOString().split('T')[0];
 
         const response = await fetch(
-          `https://eodhd.com/api/eod/${symbol}?from=${fromDate}&to=${toDate}&api_token=${API_TOKEN}&fmt=json`
+          `https://eodhd.com/api/eod/${cleanSymbol}?from=${fromDate}&to=${toDate}&api_token=${API_TOKEN}&fmt=json`
         );
 
-        console.log(`https://eodhd.com/api/eod/${symbol}?from=${fromDate}&to=${toDate}&api_token=${API_TOKEN}&fmt=json`)
+        console.log(`https://eodhd.com/api/eod/${cleanSymbol}?from=${fromDate}&to=${toDate}&api_token=${API_TOKEN}&fmt=json`);
 
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
@@ -208,16 +208,17 @@ const StockChart: React.FC<StockChartProps> = ({ symbol }) => {
             size: 14
           },
           color: '#b9d6ee'
-        }
+        },
+        reverse: true
       }
     },
     elements: {
       line: {
-        tension: 0.1 // Menos suavizado para mostrar mejor las fluctuaciones
+        tension: 0.1
       }
     },
     animation: {
-      duration: 1500 // Animación al cargar
+      duration: 1500
     },
     color: '#b9d6ee'
   };
