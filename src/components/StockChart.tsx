@@ -85,6 +85,8 @@ const StockChart: React.FC<StockChartProps> = ({ symbol }) => {
 
         console.log(`https://eodhd.com/api/eod/${symbol}?from=${fromDate}&to=${toDate}&api_token=${API_TOKEN}&fmt=json`)
 
+        console.log(`https://eodhd.com/api/eod/${symbol}?from=${fromDate}&to=${toDate}&api_token=${API_TOKEN}&fmt=json`)
+
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
         }

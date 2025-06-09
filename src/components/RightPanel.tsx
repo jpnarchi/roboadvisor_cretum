@@ -534,6 +534,18 @@ const RightPanel: React.FC<RightPanelProps> = ({ selectedCompany, selectedTicker
     ? stockData.Price.toString()
     : stockData?.Price;
 
+  // Add these helper functions at the top of the file with other utility functions
+  const calculateUpside = (targetPrice: number, currentPrice: number): string => {
+    const percentage = ((targetPrice - currentPrice) / currentPrice) * 100;
+    const sign = percentage >= 0 ? '+' : '';
+    return `${sign}${percentage.toFixed(1)}%`;
+  };
+
+  const getUpsideColor = (targetPrice: number, currentPrice: number): string => {
+    const percentage = ((targetPrice - currentPrice) / currentPrice) * 100;
+    return percentage >= 0 ? 'text-green-400' : 'text-red-400';
+  };
+
   return (
     <div className="flex-1 glass-panel p-8 overflow-hidden flex flex-col w-full bg-gradient-to-br from-black/40 to-[#b9d6ee]/5 backdrop-blur-xl">
       {isExporting && (
@@ -598,7 +610,16 @@ const RightPanel: React.FC<RightPanelProps> = ({ selectedCompany, selectedTicker
                 </div>
                 <div className="glass-panel p-4 rounded-xl border border-[#b9d6ee]/10 bg-gradient-to-br from-[#b9d6ee]/5 to-transparent backdrop-blur-lg shadow-glow">
                   <span className="text-sm uppercase tracking-wider text-[#b9d6ee]/70 font-medium">Price Target</span>
-                  <p className="text-2xl font-bold text-white mt-1">{stockData.eodhd ? formatCurrency(stockData.eodhd["AnalystRatings::TargetPrice"]) : (stockData.overview?.AnalystTargetPrice || 'N/A')}</p>
+                  <div className="flex items-baseline gap-2">
+                    <p className="text-2xl font-bold text-white mt-1">
+                      {stockData.eodhd ? formatCurrency(stockData.eodhd["AnalystRatings::TargetPrice"]) : (stockData.overview?.AnalystTargetPrice || 'N/A')}
+                    </p>
+                    {stockData.eodhd?.["AnalystRatings::TargetPrice"] && price && (
+                      <span className={`text-sm font-medium ${getUpsideColor(Number(stockData.eodhd["AnalystRatings::TargetPrice"]), Number(price))}`}>
+                        {calculateUpside(Number(stockData.eodhd["AnalystRatings::TargetPrice"]), Number(price))}
+                      </span>
+                    )}
+                  </div>
                 </div>
                 {!isLoading && stockData && (
                   <div className={`glass-panel p-4 rounded-xl border bg-gradient-to-br to-transparent backdrop-blur-lg shadow-glow ${getRatingBackground(stockData.Rating)}`}>
