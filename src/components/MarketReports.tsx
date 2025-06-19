@@ -121,8 +121,8 @@ const MarketReports: React.FC<MarketReportsProps> = ({
     console.log('Filtering reports. Search query:', searchQuery, 'Selected letter:', selectedLetter);
     let filteredResults = [...allReports];
 
-    // Aplicar filtro alfabético si hay una letra seleccionada
-    if (selectedLetter) {
+    // Aplicar filtro alfabético si hay una letra seleccionada (solo en desktop)
+    if (selectedLetter && window.innerWidth >= 1024) {
       filteredResults = filteredResults.filter(report => {
         const title = report.title.toUpperCase();
         const symbol = report.stock_symbol.toUpperCase();
@@ -309,13 +309,13 @@ const MarketReports: React.FC<MarketReportsProps> = ({
   };
 
   return (
-    <div className="flex flex-1 gap-4 p-4 overflow-hidden">
-      <div className="flex-1 flex flex-col gap-4 overflow-hidden">
-        <div className="glass-panel p-6 flex flex-col h-full">
-          <div className="flex items-center justify-between mb-6">
+    <div className="flex flex-col lg:flex-row flex-1 gap-2 sm:gap-4 p-2 sm:p-4 overflow-hidden">
+      <div className="flex-1 flex flex-col gap-2 sm:gap-4 overflow-hidden">
+        <div className="glass-panel p-3 sm:p-6 flex flex-col h-full">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 sm:mb-6 gap-3">
             <div>
-              <h2 className="text-2xl font-bold text-[#b9d6ee]">Market Reports</h2>
-              <p className="text-sm text-[#b9d6ee]/70 mt-1">
+              <h2 className="text-xl sm:text-2xl font-bold text-[#b9d6ee]">Market Reports</h2>
+              <p className="text-xs sm:text-sm text-[#b9d6ee]/70 mt-1">
                 {reports.length} reports available
                 {totalSelectedReports > 0 && (
                   <span className="ml-2 text-[#b9d6ee]">
@@ -327,7 +327,7 @@ const MarketReports: React.FC<MarketReportsProps> = ({
             <div className="flex gap-2">
               <button
                 onClick={() => handleTypeChange('quarter')}
-                className={`px-4 py-2 rounded-lg transition-colors ${
+                className={`px-3 sm:px-4 py-2 rounded-lg transition-colors text-sm ${
                   selectedType === 'quarter'
                     ? 'bg-[#b9d6ee] text-black'
                     : 'bg-[#b9d6ee]/10 text-[#b9d6ee] hover:bg-[#b9d6ee]/20'
@@ -342,7 +342,7 @@ const MarketReports: React.FC<MarketReportsProps> = ({
               </button>
               <button
                 onClick={() => handleTypeChange('research')}
-                className={`px-4 py-2 rounded-lg transition-colors ${
+                className={`px-3 sm:px-4 py-2 rounded-lg transition-colors text-sm ${
                   selectedType === 'research'
                     ? 'bg-[#b9d6ee] text-black'
                     : 'bg-[#b9d6ee]/10 text-[#b9d6ee] hover:bg-[#b9d6ee]/20'
@@ -359,8 +359,8 @@ const MarketReports: React.FC<MarketReportsProps> = ({
           </div>
 
           {totalSelectedReports > 0 && (
-            <div className="mb-4 p-4 bg-gradient-to-r from-[#b9d6ee]/10 to-[#b9d6ee]/5 border border-[#b9d6ee]/20 rounded-lg backdrop-blur-sm">
-              <div className="flex items-center justify-between">
+            <div className="mb-4 p-3 sm:p-4 bg-gradient-to-r from-[#b9d6ee]/10 to-[#b9d6ee]/5 border border-[#b9d6ee]/20 rounded-lg backdrop-blur-sm">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                 <div className="flex items-center gap-3">
                   <div className="flex items-center justify-center w-8 h-8 bg-[#b9d6ee]/20 rounded-full">
                     <span className="text-[#b9d6ee] font-semibold text-sm">
@@ -368,7 +368,7 @@ const MarketReports: React.FC<MarketReportsProps> = ({
                     </span>
                   </div>
                   <div>
-                    <span className="text-[#b9d6ee] font-medium">
+                    <span className="text-[#b9d6ee] font-medium text-sm">
                       {totalSelectedReports} document{totalSelectedReports !== 1 ? 's' : ''} selected
                     </span>
                     <p className="text-xs text-[#b9d6ee]/60 mt-0.5">
@@ -381,13 +381,13 @@ const MarketReports: React.FC<MarketReportsProps> = ({
                     </p>
                   </div>
                 </div>
-                <div className="flex gap-3">
+                <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
                   <button
                     onClick={() => {
                       setSelectedQuarterReports(new Set());
                       setSelectedResearchReports(new Set());
                     }}
-                    className="flex items-center gap-2 px-4 py-2 text-sm bg-red-500/20 text-red-400 rounded-lg hover:bg-red-500/30 transition-all duration-200 border border-red-500/30 hover:border-red-500/50"
+                    className="flex items-center justify-center gap-2 px-3 sm:px-4 py-2 text-sm bg-red-500/20 text-red-400 rounded-lg hover:bg-red-500/30 transition-all duration-200 border border-red-500/30 hover:border-red-500/50"
                   >
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -397,7 +397,7 @@ const MarketReports: React.FC<MarketReportsProps> = ({
                   <button
                     onClick={handleAnalyzeMultiple}
                     disabled={isAnalyzingMultiple}
-                    className="flex items-center gap-2 px-4 py-2 text-sm bg-gradient-to-r from-[#b9d6ee]/20 to-[#b9d6ee]/10 text-[#b9d6ee] rounded-lg hover:from-[#b9d6ee]/30 hover:to-[#b9d6ee]/20 transition-all duration-200 border border-[#b9d6ee]/30 hover:border-[#b9d6ee]/50 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-xl"
+                    className="flex items-center justify-center gap-2 px-3 sm:px-4 py-2 text-sm bg-gradient-to-r from-[#b9d6ee]/20 to-[#b9d6ee]/10 text-[#b9d6ee] rounded-lg hover:from-[#b9d6ee]/30 hover:to-[#b9d6ee]/20 transition-all duration-200 border border-[#b9d6ee]/30 hover:border-[#b9d6ee]/50 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-xl"
                   >
                     {isAnalyzingMultiple ? (
                       <>
@@ -416,7 +416,8 @@ const MarketReports: React.FC<MarketReportsProps> = ({
             </div>
           )}
 
-          <div className="mb-4">
+          {/* Alphabet filter - only show on desktop */}
+          <div className="hidden lg:block mb-4">
             <div className="flex flex-wrap gap-2 justify-center">
               {alphabet.map((letter) => (
                 <button
@@ -434,16 +435,16 @@ const MarketReports: React.FC<MarketReportsProps> = ({
             </div>
           </div>
 
-          <div className="relative mb-6">
+          <div className="relative mb-4 sm:mb-6">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <Search className="h-5 w-5 text-[#b9d6ee]/50" />
+              <Search className="h-4 w-4 sm:h-5 sm:w-5 text-[#b9d6ee]/50" />
             </div>
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => onSearchChange(e.target.value)}
               placeholder="Search by ticker, company name, document name, or report type..."
-              className="w-full pl-10 pr-4 py-3 bg-black/30 border border-[#b9d6ee]/20 rounded-lg text-[#b9d6ee] placeholder-[#b9d6ee]/50 focus:outline-none focus:ring-2 focus:ring-[#b9d6ee]/50"
+              className="w-full pl-10 pr-4 py-2 sm:py-3 bg-black/30 border border-[#b9d6ee]/20 rounded-lg text-[#b9d6ee] placeholder-[#b9d6ee]/50 focus:outline-none focus:ring-2 focus:ring-[#b9d6ee]/50 text-sm sm:text-base"
             />
           </div>
 
@@ -453,17 +454,17 @@ const MarketReports: React.FC<MarketReportsProps> = ({
                 <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-[#b9d6ee]"></div>
               </div>
             ) : error ? (
-              <div className="text-red-400 text-center p-4">{error}</div>
+              <div className="text-red-400 text-center p-4 text-sm">{error}</div>
             ) : reports.length === 0 ? (
-              <div className="text-center text-[#b9d6ee]/70 p-8">
+              <div className="text-center text-[#b9d6ee]/70 p-8 text-sm">
                 No reports found matching your search
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-4">
                 {reports.map((report) => (
                   <div
                     key={report.id}
-                    className={`glass-panel p-4 rounded-lg hover:bg-white/5 transition-colors text-left relative ${
+                    className={`glass-panel p-3 sm:p-4 rounded-lg hover:bg-white/5 transition-colors text-left relative ${
                       selectedReport?.id === report.id ? 'ring-2 ring-[#b9d6ee]' : ''
                     } ${isReportSelected(report.id) ? 'ring-2 ring-[#b9d6ee] bg-[#b9d6ee]/10' : ''}`}
                   >
@@ -487,14 +488,14 @@ const MarketReports: React.FC<MarketReportsProps> = ({
                     >
                       <div className="flex justify-between items-start mb-2">
                         <div className="pr-6">
-                          <h3 className="text-lg font-semibold text-[#b9d6ee]">{report.title}</h3>
-                          <p className="text-sm text-[#b9d6ee]/70">{report.stock_symbol}</p>
+                          <h3 className="text-base sm:text-lg font-semibold text-[#b9d6ee]">{report.title}</h3>
+                          <p className="text-xs sm:text-sm text-[#b9d6ee]/70">{report.stock_symbol}</p>
                           <p className="text-xs text-[#b9d6ee]/50 mt-1">
                             {getFileName(report.file_url)}
                           </p>
                         </div>
                       </div>
-                      <p className="text-sm text-[#b9d6ee]/70 mb-3 line-clamp-2">
+                      <p className="text-xs sm:text-sm text-[#b9d6ee]/70 mb-3 line-clamp-2">
                         {report.description}
                       </p>
                     </button>
@@ -503,7 +504,7 @@ const MarketReports: React.FC<MarketReportsProps> = ({
                       <span className="text-xs text-[#b9d6ee]/50">
                         {new Date(report.created_at).toLocaleDateString()}
                       </span>
-                      <div className="flex gap-2">
+                      <div className="flex gap-1 sm:gap-2">
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
@@ -513,7 +514,8 @@ const MarketReports: React.FC<MarketReportsProps> = ({
                           title="Analizar con IA"
                         >
                           <Bot className="w-3 h-3 text-[#b9d6ee]" />
-                          <span className="text-[#b9d6ee]">Analizar con IA</span>
+                          <span className="hidden sm:inline text-[#b9d6ee]">Analizar con IA</span>
+                          <span className="sm:hidden text-[#b9d6ee]">IA</span>
                         </button>
                         <a
                           href={report.file_url}
@@ -536,9 +538,9 @@ const MarketReports: React.FC<MarketReportsProps> = ({
       </div>
 
       {selectedReport && (
-        <div className="w-1/2 glass-panel p-6 flex flex-col">
+        <div className="w-full lg:w-1/2 glass-panel p-3 sm:p-6 flex flex-col">
           <div className="mb-4">
-            <h3 className="text-xl font-bold text-[#b9d6ee]">{selectedReport.stock_symbol}</h3>
+            <h3 className="text-lg sm:text-xl font-bold text-[#b9d6ee]">{selectedReport.stock_symbol}</h3>
             <p className="text-sm text-[#b9d6ee]/70">{selectedReport.title}</p>
             <p className="text-xs text-[#b9d6ee]/50 mt-1">
               {getFileName(selectedReport.file_url)}

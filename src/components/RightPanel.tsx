@@ -547,7 +547,7 @@ const RightPanel: React.FC<RightPanelProps> = ({ selectedCompany, selectedTicker
   };
 
   return (
-    <div className="flex-1 glass-panel p-8 overflow-hidden flex flex-col w-full bg-gradient-to-br from-black/40 to-[#b9d6ee]/5 backdrop-blur-xl">
+    <div className="flex-1 glass-panel p-4 sm:p-8 overflow-hidden flex flex-col w-full bg-gradient-to-br from-black/40 to-[#b9d6ee]/5 backdrop-blur-xl">
       {isExporting && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-black/80 p-8 rounded-xl flex flex-col items-center">
@@ -558,19 +558,19 @@ const RightPanel: React.FC<RightPanelProps> = ({ selectedCompany, selectedTicker
       )}
       
       {selectedCompany ? (
-        <div className="flex flex-col items-center p-3 overflow-auto w-full" ref={contentRef}>
-          <div className="flex justify-between items-start w-full mb-8">
+        <div className="flex flex-col items-center p-2 sm:p-3 overflow-auto w-full" ref={contentRef}>
+          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start w-full mb-6 sm:mb-8 gap-4">
             <div className="flex-1">
-              <div className="flex items-center justify-between w-full">
-                <div className="flex items-center gap-3 mb-2">
-                  <h2 className="text-4xl font-extrabold tracking-tight bg-gradient-to-r text-white bg-clip-text text-transparent">{selectedCompany}</h2>
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between w-full gap-3">
+                <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 mb-2">
+                  <h2 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold tracking-tight bg-gradient-to-r text-white bg-clip-text text-transparent leading-tight">{selectedCompany}</h2>
                   {selectedTicker && (
-                    <div className="flex items-center gap-2">
-                      <span className="text-lg font-bold text-[#b9d6ee] bg-[#b9d6ee]/5 px-4 py-1.5 rounded-lg border border-[#b9d6ee]/20 shadow-glow">
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                      <span className="text-base sm:text-lg font-bold text-[#b9d6ee] bg-[#b9d6ee]/5 px-3 sm:px-4 py-1.5 rounded-lg border border-[#b9d6ee]/20 shadow-glow">
                         ({selectedTicker})
                       </span>
                       {stockData?.market && (
-                        <span className="text-sm font-medium text-[#b9d6ee]/70 bg-[#b9d6ee]/5 px-2 py-1 rounded border border-[#b9d6ee]/20">
+                        <span className="text-xs sm:text-sm font-medium text-[#b9d6ee]/70 bg-[#b9d6ee]/5 px-2 py-1 rounded border border-[#b9d6ee]/20">
                           {stockData.market}
                         </span>
                       )}
@@ -579,15 +579,16 @@ const RightPanel: React.FC<RightPanelProps> = ({ selectedCompany, selectedTicker
                 </div>
                 <button
                   onClick={handleExportPDF}
-                  className="export-button flex items-center gap-2 px-4 py-2 bg-[#b9d6ee]/10 hover:bg-[#b9d6ee]/20 text-[#b9d6ee] rounded-lg border border-[#b9d6ee]/20 transition-all duration-200 shadow-glow"
+                  className="export-button flex items-center justify-center gap-2 px-3 sm:px-4 py-2 bg-[#b9d6ee]/10 hover:bg-[#b9d6ee]/20 text-[#b9d6ee] rounded-lg border border-[#b9d6ee]/20 transition-all duration-200 shadow-glow text-sm sm:text-base"
                 >
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 sm:h-5 sm:w-5" viewBox="0 0 20 20" fill="currentColor">
                     <path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clipRule="evenodd" />
                   </svg>
-                  Export PDF
+                  <span className="hidden sm:inline">Export PDF</span>
+                  <span className="sm:hidden">PDF</span>
                 </button>
               </div>
-              <p className="text-[#b9d6ee]/60 text-sm">
+              <p className="text-[#b9d6ee]/60 text-xs sm:text-sm">
                 {stockData?.eodhd ? stockData.eodhd["General::Sector"] : (stockData?.overview?.Sector || 'Sector not available')}
               </p>
             </div>
@@ -599,32 +600,32 @@ const RightPanel: React.FC<RightPanelProps> = ({ selectedCompany, selectedTicker
             </div>
           ) : stockData && (
             <>
-              <div className="mt-4 grid grid-cols-4 gap-6 w-full">
-                <div className="glass-panel p-4 rounded-xl border border-[#b9d6ee]/10 bg-gradient-to-br from-[#b9d6ee]/5 to-transparent backdrop-blur-lg shadow-glow">
-                  <span className="text-sm uppercase tracking-wider text-[#b9d6ee]/70 font-medium">Price</span>
-                  <p className="text-2xl font-bold text-white mt-1">${price}</p>
+              <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-6 w-full">
+                <div className="glass-panel p-3 sm:p-4 rounded-xl border border-[#b9d6ee]/10 bg-gradient-to-br from-[#b9d6ee]/5 to-transparent backdrop-blur-lg shadow-glow">
+                  <span className="text-xs sm:text-sm uppercase tracking-wider text-[#b9d6ee]/70 font-medium">Price</span>
+                  <p className="text-lg sm:text-xl lg:text-2xl font-bold text-white mt-1">${price}</p>
                 </div>
-                <div className="glass-panel p-4 rounded-xl border border-[#b9d6ee]/10 bg-gradient-to-br from-[#b9d6ee]/5 to-transparent backdrop-blur-lg shadow-glow">
-                  <span className="text-sm uppercase tracking-wider text-[#b9d6ee]/70 font-medium">Market Cap</span>
-                  <p className="text-2xl font-bold text-white mt-1">{formatMarketCap(marketCap)}</p>
+                <div className="glass-panel p-3 sm:p-4 rounded-xl border border-[#b9d6ee]/10 bg-gradient-to-br from-[#b9d6ee]/5 to-transparent backdrop-blur-lg shadow-glow">
+                  <span className="text-xs sm:text-sm uppercase tracking-wider text-[#b9d6ee]/70 font-medium">Market Cap</span>
+                  <p className="text-lg sm:text-xl lg:text-2xl font-bold text-white mt-1">{formatMarketCap(marketCap)}</p>
                 </div>
-                <div className="glass-panel p-4 rounded-xl border border-[#b9d6ee]/10 bg-gradient-to-br from-[#b9d6ee]/5 to-transparent backdrop-blur-lg shadow-glow">
-                  <span className="text-sm uppercase tracking-wider text-[#b9d6ee]/70 font-medium">Price Target</span>
-                  <div className="flex items-baseline gap-2">
-                    <p className="text-2xl font-bold text-white mt-1">
+                <div className="glass-panel p-3 sm:p-4 rounded-xl border border-[#b9d6ee]/10 bg-gradient-to-br from-[#b9d6ee]/5 to-transparent backdrop-blur-lg shadow-glow">
+                  <span className="text-xs sm:text-sm uppercase tracking-wider text-[#b9d6ee]/70 font-medium">Price Target</span>
+                  <div className="flex flex-col sm:flex-row sm:items-baseline gap-1 sm:gap-2">
+                    <p className="text-lg sm:text-xl lg:text-2xl font-bold text-white mt-1">
                       {stockData.eodhd ? formatCurrency(stockData.eodhd["AnalystRatings::TargetPrice"]) : (stockData.overview?.AnalystTargetPrice || 'N/A')}
                     </p>
                     {stockData.eodhd?.["AnalystRatings::TargetPrice"] && price && (
-                      <span className={`text-sm font-medium ${getUpsideColor(Number(stockData.eodhd["AnalystRatings::TargetPrice"]), Number(price))}`}>
+                      <span className={`text-xs sm:text-sm font-medium ${getUpsideColor(Number(stockData.eodhd["AnalystRatings::TargetPrice"]), Number(price))}`}>
                         {calculateUpside(Number(stockData.eodhd["AnalystRatings::TargetPrice"]), Number(price))}
                       </span>
                     )}
                   </div>
                 </div>
                 {!isLoading && stockData && (
-                  <div className={`glass-panel p-4 rounded-xl border bg-gradient-to-br to-transparent backdrop-blur-lg shadow-glow ${getRatingBackground(stockData.Rating)}`}>
-                    <span className="text-sm uppercase tracking-wider text-[#b9d6ee]/70 font-medium">Rating</span>
-                    <div className={`text-2xl font-black mt-1 ${getRatingColor(stockData.Rating)}`}>
+                  <div className={`glass-panel p-3 sm:p-4 rounded-xl border bg-gradient-to-br to-transparent backdrop-blur-lg shadow-glow ${getRatingBackground(stockData.Rating)}`}>
+                    <span className="text-xs sm:text-sm uppercase tracking-wider text-[#b9d6ee]/70 font-medium">Rating</span>
+                    <div className={`text-lg sm:text-xl lg:text-2xl font-black mt-1 ${getRatingColor(stockData.Rating)}`}>
                       {stockData.Rating || 'N/A'}
                       <div className="text-xs text-[#b9d6ee]/50 font-medium">
                         {stockData["Rated On"] ? `Rated ${stockData["Rated On"]}` : 'Not rated'}
@@ -634,67 +635,67 @@ const RightPanel: React.FC<RightPanelProps> = ({ selectedCompany, selectedTicker
                 )}
               </div>
 
-              <div className="mt-8 grid grid-cols-1 lg:grid-cols-2 gap-6 w-full">
-                <div className="glass-panel p-6 rounded-xl border border-[#b9d6ee]/10 bg-gradient-to-br from-[#b9d6ee]/5 to-transparent backdrop-blur-lg shadow-glow">
-                  <h3 className="text-lg font-semibold mb-6 text-[#b9d6ee] flex items-center">
+              <div className="mt-6 sm:mt-8 grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 w-full">
+                <div className="glass-panel p-4 sm:p-6 rounded-xl border border-[#b9d6ee]/10 bg-gradient-to-br from-[#b9d6ee]/5 to-transparent backdrop-blur-lg shadow-glow">
+                  <h3 className="text-base sm:text-lg font-semibold mb-4 sm:mb-6 text-[#b9d6ee] flex items-center">
                     <span className="mr-2">Key Metrics</span>
                     <div className="h-px flex-1 bg-gradient-to-r from-[#b9d6ee]/20 to-transparent"></div>
                   </h3>
-                  <div className="grid grid-cols-2 gap-6">
+                  <div className="grid grid-cols-2 gap-4 sm:gap-6">
                     <div>
-                      <span className="text-sm text-[#b9d6ee]/70 font-medium">P/E Ratio</span>
-                      <p className="text-2xl font-bold text-white mt-1">{formatNumber(peRatio)}</p>
+                      <span className="text-xs sm:text-sm text-[#b9d6ee]/70 font-medium">P/E Ratio</span>
+                      <p className="text-lg sm:text-xl lg:text-2xl font-bold text-white mt-1">{formatNumber(peRatio)}</p>
                     </div>
                     <div>
-                      <span className="text-sm text-[#b9d6ee]/70 font-medium">P/B Ratio</span>
-                      <p className="text-2xl font-bold text-white mt-1">{formatNumber(stockData.eodhd ? stockData.eodhd["Valuation::PriceBookMRQ"] : stockData.overview?.PriceToBookRatio)}</p>
+                      <span className="text-xs sm:text-sm text-[#b9d6ee]/70 font-medium">P/B Ratio</span>
+                      <p className="text-lg sm:text-xl lg:text-2xl font-bold text-white mt-1">{formatNumber(stockData.eodhd ? stockData.eodhd["Valuation::PriceBookMRQ"] : stockData.overview?.PriceToBookRatio)}</p>
                     </div>
                     <div>
-                      <span className="text-sm text-[#b9d6ee]/70 font-medium">Dividend Yield</span>
-                      <p className="text-2xl font-bold text-white mt-1">{formatPercentage(dividendYield)}</p>
+                      <span className="text-xs sm:text-sm text-[#b9d6ee]/70 font-medium">Dividend Yield</span>
+                      <p className="text-lg sm:text-xl lg:text-2xl font-bold text-white mt-1">{formatPercentage(dividendYield)}</p>
                     </div>
                     <div>
-                      <span className="text-sm text-[#b9d6ee]/70 font-medium">Beta</span>
-                      <p className="text-2xl font-bold text-white mt-1">{formatNumber(beta)}</p>
+                      <span className="text-xs sm:text-sm text-[#b9d6ee]/70 font-medium">Beta</span>
+                      <p className="text-lg sm:text-xl lg:text-2xl font-bold text-white mt-1">{formatNumber(beta)}</p>
                     </div>
                   </div>
                 </div>
 
-                <div className="glass-panel p-6 rounded-xl border border-[#b9d6ee]/10 bg-gradient-to-br from-[#b9d6ee]/5 to-transparent backdrop-blur-lg shadow-glow">
-                  <h3 className="text-lg font-semibold mb-6 text-[#b9d6ee] flex items-center">
+                <div className="glass-panel p-4 sm:p-6 rounded-xl border border-[#b9d6ee]/10 bg-gradient-to-br from-[#b9d6ee]/5 to-transparent backdrop-blur-lg shadow-glow">
+                  <h3 className="text-base sm:text-lg font-semibold mb-4 sm:mb-6 text-[#b9d6ee] flex items-center">
                     <span className="mr-2">Returns & Targets</span>
                     <div className="h-px flex-1 bg-gradient-to-r from-[#b9d6ee]/20 to-transparent"></div>
                   </h3>
-                  <div className="grid grid-cols-2 gap-6">
+                  <div className="grid grid-cols-2 gap-4 sm:gap-6">
                     <div>
-                      <span className="text-sm text-[#b9d6ee]/70 font-medium">ROA</span>
-                      <p className="text-2xl font-bold text-white mt-1">{formatPercentage(stockData.eodhd ? stockData.eodhd["Highlights::ReturnOnAssetsTTM"] : stockData.overview?.ReturnOnAssetsTTM)}</p>
+                      <span className="text-xs sm:text-sm text-[#b9d6ee]/70 font-medium">ROA</span>
+                      <p className="text-lg sm:text-xl lg:text-2xl font-bold text-white mt-1">{formatPercentage(stockData.eodhd ? stockData.eodhd["Highlights::ReturnOnAssetsTTM"] : stockData.overview?.ReturnOnAssetsTTM)}</p>
                     </div>
                     <div>
-                      <span className="text-sm text-[#b9d6ee]/70 font-medium">ROE</span>
-                      <p className="text-2xl font-bold text-white mt-1">{formatPercentage(stockData.eodhd ? stockData.eodhd["Highlights::ReturnOnEquityTTM"] : stockData.overview?.ReturnOnEquityTTM)}</p>
+                      <span className="text-xs sm:text-sm text-[#b9d6ee]/70 font-medium">ROE</span>
+                      <p className="text-lg sm:text-xl lg:text-2xl font-bold text-white mt-1">{formatPercentage(stockData.eodhd ? stockData.eodhd["Highlights::ReturnOnEquityTTM"] : stockData.overview?.ReturnOnEquityTTM)}</p>
                     </div>
                     <div>
-                      <span className="text-sm text-[#b9d6ee]/70 font-medium">Target Price</span>
-                      <p className="text-2xl font-bold text-white mt-1">{formatCurrency(stockData.eodhd ? stockData.eodhd["AnalystRatings::TargetPrice"] : stockData.overview?.AnalystTargetPrice)}</p>
+                      <span className="text-xs sm:text-sm text-[#b9d6ee]/70 font-medium">Target Price</span>
+                      <p className="text-lg sm:text-xl lg:text-2xl font-bold text-white mt-1">{formatCurrency(stockData.eodhd ? stockData.eodhd["AnalystRatings::TargetPrice"] : stockData.overview?.AnalystTargetPrice)}</p>
                     </div>
                     <div>
-                      <span className="text-sm text-[#b9d6ee]/70 font-medium">Ex-Dividend</span>
-                      <p className="text-2xl font-bold text-white mt-1">{stockData.eodhd ? stockData.eodhd["SplitsDividends::ExDividendDate"] : (stockData.overview?.ExDividendDate || 'N/A')}</p>
+                      <span className="text-xs sm:text-sm text-[#b9d6ee]/70 font-medium">Ex-Dividend</span>
+                      <p className="text-lg sm:text-xl lg:text-2xl font-bold text-white mt-1">{stockData.eodhd ? stockData.eodhd["SplitsDividends::ExDividendDate"] : (stockData.overview?.ExDividendDate || 'N/A')}</p>
                     </div>
                   </div>
                 </div>
 
-                <div className="glass-panel p-6 rounded-xl border border-[#b9d6ee]/10 bg-gradient-to-br from-[#b9d6ee]/5 to-transparent backdrop-blur-lg shadow-glow col-span-1 lg:col-span-2">
-                  <h3 className="text-lg font-semibold mb-6 text-[#b9d6ee] flex items-center">
+                <div className="glass-panel p-4 sm:p-6 rounded-xl border border-[#b9d6ee]/10 bg-gradient-to-br from-[#b9d6ee]/5 to-transparent backdrop-blur-lg shadow-glow col-span-1 lg:col-span-2">
+                  <h3 className="text-base sm:text-lg font-semibold mb-4 sm:mb-6 text-[#b9d6ee] flex items-center">
                     <span className="mr-2">Analyst Ratings</span>
                     <div className="h-px flex-1 bg-gradient-to-r from-[#b9d6ee]/20 to-transparent"></div>
                   </h3>
-                  <div className="flex justify-between items-center w-full">
-                    <div className="flex-1">
+                  <div className="flex flex-col sm:flex-row justify-between items-center w-full gap-4 sm:gap-8">
+                    <div className="flex-1 w-full">
                       <div className="flex items-center justify-between mb-2">
-                        <span className="text-sm text-[#b9d6ee]/70 font-medium">Buy</span>
-                        <span className="text-xl font-bold text-green-400">
+                        <span className="text-xs sm:text-sm text-[#b9d6ee]/70 font-medium">Buy</span>
+                        <span className="text-lg sm:text-xl font-bold text-green-400">
                           {stockData.eodhd 
                             ? (stockData.eodhd["AnalystRatings::StrongBuy"] + stockData.eodhd["AnalystRatings::Buy"]) 
                             : (stockData.overview?.AnalystRatingBuy || '0')}
@@ -717,10 +718,10 @@ const RightPanel: React.FC<RightPanelProps> = ({ selectedCompany, selectedTicker
                         ></div>
                       </div>
                     </div>
-                    <div className="flex-1 mx-8">
+                    <div className="flex-1 w-full">
                       <div className="flex items-center justify-between mb-2">
-                        <span className="text-sm text-[#b9d6ee]/70 font-medium">Hold</span>
-                        <span className="text-xl font-bold text-yellow-400">
+                        <span className="text-xs sm:text-sm text-[#b9d6ee]/70 font-medium">Hold</span>
+                        <span className="text-lg sm:text-xl font-bold text-yellow-400">
                           {stockData.eodhd 
                             ? stockData.eodhd["AnalystRatings::Hold"] 
                             : (stockData.overview?.AnalystRatingHold || '0')}
@@ -743,10 +744,10 @@ const RightPanel: React.FC<RightPanelProps> = ({ selectedCompany, selectedTicker
                         ></div>
                       </div>
                     </div>
-                    <div className="flex-1">
+                    <div className="flex-1 w-full">
                       <div className="flex items-center justify-between mb-2">
-                        <span className="text-sm text-[#b9d6ee]/70 font-medium">Sell</span>
-                        <span className="text-xl font-bold text-red-400">
+                        <span className="text-xs sm:text-sm text-[#b9d6ee]/70 font-medium">Sell</span>
+                        <span className="text-lg sm:text-xl font-bold text-red-400">
                           {stockData.eodhd 
                             ? (stockData.eodhd["AnalystRatings::Sell"] + stockData.eodhd["AnalystRatings::StrongSell"]) 
                             : (stockData.overview?.AnalystRatingSell || '0')}
@@ -785,12 +786,12 @@ const RightPanel: React.FC<RightPanelProps> = ({ selectedCompany, selectedTicker
           
           {selectedTicker && (
             <>
-              <div className="mt-6 w-full glass-panel p-6 rounded-xl border border-[#b9d6ee]/10 bg-gradient-to-br from-[#b9d6ee]/5 to-transparent backdrop-blur-lg shadow-glow">
-                <h3 className="text-lg font-semibold mb-6 text-[#b9d6ee] flex items-center">
+              <div className="mt-6 w-full glass-panel p-4 sm:p-6 rounded-xl border border-[#b9d6ee]/10 bg-gradient-to-br from-[#b9d6ee]/5 to-transparent backdrop-blur-lg shadow-glow">
+                <h3 className="text-base sm:text-lg font-semibold mb-4 sm:mb-6 text-[#b9d6ee] flex items-center">
                   <span className="mr-2">Daily Price Chart</span>
                   <div className="h-px flex-1 bg-gradient-to-r from-[#b9d6ee]/20 to-transparent"></div>
                 </h3>
-                <div className="h-64">
+                <div className="h-48 sm:h-64">
                   <StockChart symbol={selectedTicker} />
                 </div>
               </div>
@@ -799,7 +800,7 @@ const RightPanel: React.FC<RightPanelProps> = ({ selectedCompany, selectedTicker
         </div>
       ) : (
         <div className="h-full flex items-center justify-center">
-          <img src="/menlog.svg" alt="CRETUM Partners Logo" className="h-32 w-auto opacity-10" />
+          <img src="/menlog.svg" alt="CRETUM Partners Logo" className="h-24 sm:h-32 w-auto opacity-10" />
         </div>
       )}
     </div>

@@ -425,20 +425,20 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ onCompanySelected, stocks, ex
    *  Render
    *  -------------------------------------------------------------- */
   return (
-    <div className="w-1/3 glass-panel flex flex-col">
+    <div className="w-full lg:w-1/3 glass-panel flex flex-col">
       {/* Header */}
-      <div className="p-4 border-b border-[#b9d6ee]/10">
-        <h2 className="text-xl font-bold text-[#b9d6ee]">AI Assistant</h2>
+      <div className="p-3 sm:p-4 border-b border-[#b9d6ee]/10">
+        <h2 className="text-lg sm:text-xl font-bold text-[#b9d6ee]">AI Assistant</h2>
       </div>
 
       {/* Chat */}
-      <div className="flex-1 overflow-auto p-4 space-y-4">
+      <div className="flex-1 overflow-auto p-3 sm:p-4 space-y-3 sm:space-y-4">
         {chatMessages
           .filter(m => m.role !== 'system')
           .map((m, i) => (
-            <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'} mb-4`}>
+            <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'} mb-3 sm:mb-4`}>
               <div
-                className={`max-w-[80%] p-4 rounded-lg ${
+                className={`max-w-[85%] sm:max-w-[80%] p-3 sm:p-4 rounded-lg ${
                   m.role === 'user'
                     ? 'bg-[#b9d6ee] bg-opacity-20 text-white'
                     : 'bg-white bg-opacity-10 text-gray-200'
@@ -446,8 +446,8 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ onCompanySelected, stocks, ex
               >
                 {m.pdfData && (
                   <div className="flex items-center gap-2 mb-2 text-[#b9d6ee]">
-                    <Upload className="w-4 h-4" />
-                    <span className="text-sm">{m.pdfData.filename}</span>
+                    <Upload className="w-3 h-3 sm:w-4 sm:h-4" />
+                    <span className="text-xs sm:text-sm">{m.pdfData.filename}</span>
                   </div>
                 )}
                 <div className="markdown-content prose prose-invert max-w-none">
@@ -455,46 +455,46 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ onCompanySelected, stocks, ex
                     remarkPlugins={[remarkGfm]}
                     components={{
                       // Headings
-                      h1: ({node, ...props}) => <h1 className="text-2xl font-bold mb-4 text-[#b9d6ee]" {...props} />,
-                      h2: ({node, ...props}) => <h2 className="text-xl font-bold mb-3 text-[#b9d6ee]" {...props} />,
-                      h3: ({node, ...props}) => <h3 className="text-lg font-bold mb-2 text-[#b9d6ee]" {...props} />,
+                      h1: ({node, ...props}) => <h1 className="text-xl sm:text-2xl font-bold mb-3 sm:mb-4 text-[#b9d6ee]" {...props} />,
+                      h2: ({node, ...props}) => <h2 className="text-lg sm:text-xl font-bold mb-2 sm:mb-3 text-[#b9d6ee]" {...props} />,
+                      h3: ({node, ...props}) => <h3 className="text-base sm:text-lg font-bold mb-2 text-[#b9d6ee]" {...props} />,
                       
                       // Lists
-                      ul: ({node, ...props}) => <ul className="list-disc pl-6 mb-4 space-y-1" {...props} />,
-                      ol: ({node, ...props}) => <ol className="list-decimal pl-6 mb-4 space-y-1" {...props} />,
-                      li: ({node, ...props}) => <li className="mb-1" {...props} />,
+                      ul: ({node, ...props}) => <ul className="list-disc pl-4 sm:pl-6 mb-3 sm:mb-4 space-y-1" {...props} />,
+                      ol: ({node, ...props}) => <ol className="list-decimal pl-4 sm:pl-6 mb-3 sm:mb-4 space-y-1" {...props} />,
+                      li: ({node, ...props}) => <li className="mb-1 text-sm sm:text-base" {...props} />,
                       
                       // Code blocks
                       code: ({inline, className, children, ...props}: CodeProps) => 
                         inline ? 
-                          <code className="bg-[#b9d6ee]/10 px-1.5 py-0.5 rounded text-[#b9d6ee]" {...props}>{children}</code> :
-                          <code className="block bg-[#b9d6ee]/10 p-3 rounded-lg mb-4 overflow-x-auto" {...props}>{children}</code>,
+                          <code className="bg-[#b9d6ee]/10 px-1 sm:px-1.5 py-0.5 rounded text-[#b9d6ee] text-xs sm:text-sm" {...props}>{children}</code> :
+                          <code className="block bg-[#b9d6ee]/10 p-2 sm:p-3 rounded-lg mb-3 sm:mb-4 overflow-x-auto text-xs sm:text-sm" {...props}>{children}</code>,
                       
                       // Blockquotes
                       blockquote: ({node, ...props}) => 
-                        <blockquote className="border-l-4 border-[#b9d6ee] pl-4 italic my-4" {...props} />,
+                        <blockquote className="border-l-4 border-[#b9d6ee] pl-3 sm:pl-4 italic my-3 sm:my-4 text-sm sm:text-base" {...props} />,
                       
                       // Tables
                       table: ({node, ...props}) => 
-                        <div className="overflow-x-auto mb-4">
-                          <table className="min-w-full border-collapse" {...props} />
+                        <div className="overflow-x-auto mb-3 sm:mb-4">
+                          <table className="min-w-full border-collapse text-xs sm:text-sm" {...props} />
                         </div>,
                       th: ({node, ...props}) => 
-                        <th className="border border-[#b9d6ee]/20 px-4 py-2 bg-[#b9d6ee]/10" {...props} />,
+                        <th className="border border-[#b9d6ee]/20 px-2 sm:px-4 py-1 sm:py-2 bg-[#b9d6ee]/10" {...props} />,
                       td: ({node, ...props}) => 
-                        <td className="border border-[#b9d6ee]/20 px-4 py-2" {...props} />,
+                        <td className="border border-[#b9d6ee]/20 px-2 sm:px-4 py-1 sm:py-2" {...props} />,
                       
                       // Links
                       a: ({node, ...props}) => 
-                        <a className="text-[#b9d6ee] hover:underline" {...props} />,
+                        <a className="text-[#b9d6ee] hover:underline text-sm sm:text-base" {...props} />,
                       
                       // Paragraphs
                       p: ({node, ...props}) => 
-                        <p className="mb-4 leading-relaxed" {...props} />,
+                        <p className="mb-3 sm:mb-4 leading-relaxed text-sm sm:text-base" {...props} />,
                       
                       // Horizontal rule
                       hr: ({node, ...props}) => 
-                        <hr className="my-6 border-[#b9d6ee]/20" {...props} />,
+                        <hr className="my-4 sm:my-6 border-[#b9d6ee]/20" {...props} />,
                     }}
                   >
                     {m.content}
@@ -505,27 +505,27 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ onCompanySelected, stocks, ex
           ))}
         {isLoading && !chatMessages[chatMessages.length - 1]?.isStreaming && (
           <div className="flex justify-start">
-            <div className="glass-panel p-3 flex gap-2">
-              <div className="w-2 h-2 bg-[#b9d6ee] rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-              <div className="w-2 h-2 bg-[#b9d6ee] rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-              <div className="w-2 h-2 bg-[#b9d6ee] rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+            <div className="glass-panel p-2 sm:p-3 flex gap-1 sm:gap-2">
+              <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 bg-[#b9d6ee] rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+              <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 bg-[#b9d6ee] rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+              <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 bg-[#b9d6ee] rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
             </div>
           </div>
         )}
       </div>
 
       {/* Input */}
-      <form onSubmit={handleSendMessage} className="p-4 border-t border-[#b9d6ee]/10">
+      <form onSubmit={handleSendMessage} className="p-3 sm:p-4 border-t border-[#b9d6ee]/10">
         {currentPdf && (
           <div className="flex items-center gap-2 mb-2 text-[#b9d6ee]">
-            <Upload className="w-4 h-4" />
-            <span className="text-sm">{currentPdf.filename}</span>
+            <Upload className="w-3 h-3 sm:w-4 sm:h-4" />
+            <span className="text-xs sm:text-sm">{currentPdf.filename}</span>
           </div>
         )}
         <div className="flex gap-2 items-center">
           {/* File */}
-          <label htmlFor="pdf-upload" className="cursor-pointer p-2 bg-[#b9d6ee]/20 rounded-lg hover:bg-opacity-30">
-            <Upload className="w-5 h-5 text-[#b9d6ee]" />
+          <label htmlFor="pdf-upload" className="cursor-pointer p-1.5 sm:p-2 bg-[#b9d6ee]/20 rounded-lg hover:bg-opacity-30 flex-shrink-0">
+            <Upload className="w-4 h-4 sm:w-5 sm:h-5 text-[#b9d6ee]" />
           </label>
           <input 
             id="pdf-upload" 
@@ -541,17 +541,17 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ onCompanySelected, stocks, ex
             type="text"
             value={message}
             onChange={e => setMessage(e.target.value)}
-            className="flex-1 glass-panel px-4 py-2 text-[#b9d6ee] placeholder-[#b9d6ee]/50 focus:outline-none"
+            className="flex-1 glass-panel px-3 sm:px-4 py-2 text-[#b9d6ee] placeholder-[#b9d6ee]/50 focus:outline-none text-sm sm:text-base"
             placeholder="Escribe tu pregunta…"
             disabled={isLoading}
           />
           <button
             type="submit"
             disabled={isLoading}
-            className="p-2 bg-[#b9d6ee]/20 rounded-lg hover:bg-opacity-30 disabled:opacity-50"
+            className="p-1.5 sm:p-2 bg-[#b9d6ee]/20 rounded-lg hover:bg-opacity-30 disabled:opacity-50 flex-shrink-0"
             aria-label="Send message"
           >
-            <Send className="w-5 h-5 text-[#b9d6ee]" />
+            <Send className="w-4 h-4 sm:w-5 sm:h-5 text-[#b9d6ee]" />
           </button>
         </div>
       </form>
