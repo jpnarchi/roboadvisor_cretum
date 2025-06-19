@@ -16,9 +16,15 @@ interface MarketReportsProps {
   searchQuery: string;
   onSearchChange: (query: string) => void;
   onAnalyzeWithAI?: (pdfData: { base64: string; filename: string }) => void;
+  onAnalyzeMultipleWithAI?: (pdfDataArray: Array<{ base64: string; filename: string }>) => void;
 }
 
-const MarketReports: React.FC<MarketReportsProps> = ({ searchQuery, onSearchChange, onAnalyzeWithAI }) => {
+const MarketReports: React.FC<MarketReportsProps> = ({ 
+  searchQuery, 
+  onSearchChange, 
+  onAnalyzeWithAI,
+  onAnalyzeMultipleWithAI 
+}) => {
   const [reports, setReports] = useState<Report[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -26,6 +32,11 @@ const MarketReports: React.FC<MarketReportsProps> = ({ searchQuery, onSearchChan
   const [allReports, setAllReports] = useState<Report[]>([]);
   const [selectedLetter, setSelectedLetter] = useState<string | null>(null);
   const [selectedType, setSelectedType] = useState<'quarter' | 'research'>('quarter');
+  const [isAnalyzingMultiple, setIsAnalyzingMultiple] = useState(false);
+  const [quarterReports, setQuarterReports] = useState<Report[]>([]);
+  const [researchReports, setResearchReports] = useState<Report[]>([]);
+  const [selectedQuarterReports, setSelectedQuarterReports] = useState<Set<string>>(new Set());
+  const [selectedResearchReports, setSelectedResearchReports] = useState<Set<string>>(new Set());
 
   const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
 
@@ -40,16 +51,31 @@ const MarketReports: React.FC<MarketReportsProps> = ({ searchQuery, onSearchChan
       
       if (!results || results.length === 0) {
         console.log('No reports found for type:', selectedType);
+        if (selectedType === 'quarter') {
+          setQuarterReports([]);
+        } else {
+          setResearchReports([]);
+        }
         setAllReports([]);
         setReports([]);
       } else {
         console.log('Setting reports:', results);
+        if (selectedType === 'quarter') {
+          setQuarterReports(results);
+        } else {
+          setResearchReports(results);
+        }
         setAllReports(results);
         setReports(results);
       }
     } catch (err) {
       console.error('Error fetching reports:', err);
       setError('Error loading reports. Please try again.');
+      if (selectedType === 'quarter') {
+        setQuarterReports([]);
+      } else {
+        setResearchReports([]);
+      }
       setAllReports([]);
       setReports([]);
     } finally {
@@ -61,6 +87,35 @@ const MarketReports: React.FC<MarketReportsProps> = ({ searchQuery, onSearchChan
     console.log('Selected type changed to:', selectedType);
     fetchReports();
   }, [selectedType]);
+
+  // Load both types of reports on component mount
+  useEffect(() => {
+    const loadAllReports = async () => {
+      try {
+        // Load quarter reports
+        const quarterResults = await searchReports('quarter');
+        setQuarterReports(quarterResults || []);
+        
+        // Load research reports
+        const researchResults = await searchReports('research');
+        setResearchReports(researchResults || []);
+        
+        // Set initial reports based on selected type
+        if (selectedType === 'quarter') {
+          setAllReports(quarterResults || []);
+          setReports(quarterResults || []);
+        } else {
+          setAllReports(researchResults || []);
+          setReports(researchResults || []);
+        }
+      } catch (err) {
+        console.error('Error loading all reports:', err);
+        setError('Error loading reports. Please try again.');
+      }
+    };
+
+    loadAllReports();
+  }, []); // Only run on mount
 
   useEffect(() => {
     console.log('Filtering reports. Search query:', searchQuery, 'Selected letter:', selectedLetter);
@@ -111,6 +166,30 @@ const MarketReports: React.FC<MarketReportsProps> = ({ searchQuery, onSearchChan
     setSelectedReport(report);
   };
 
+  const handleReportSelection = (reportId: string, reportType: 'quarter' | 'research') => {
+    if (reportType === 'quarter') {
+      setSelectedQuarterReports(prev => {
+        const newSelection = new Set(prev);
+        if (newSelection.has(reportId)) {
+          newSelection.delete(reportId);
+        } else if (newSelection.size + selectedResearchReports.size < 5) {
+          newSelection.add(reportId);
+        }
+        return newSelection;
+      });
+    } else {
+      setSelectedResearchReports(prev => {
+        const newSelection = new Set(prev);
+        if (newSelection.has(reportId)) {
+          newSelection.delete(reportId);
+        } else if (newSelection.size + selectedQuarterReports.size < 5) {
+          newSelection.add(reportId);
+        }
+        return newSelection;
+      });
+    }
+  };
+
   const getFileName = (url: string) => {
     const fileName = url.split('/').pop() || '';
     return decodeURIComponent(fileName);
@@ -125,6 +204,7 @@ const MarketReports: React.FC<MarketReportsProps> = ({ searchQuery, onSearchChan
     setSelectedType(type);
     setSelectedLetter(null); // Reset letter filter when changing type
     setSelectedReport(null); // Reset selected report when changing type
+    // Don't clear selections when switching types
   };
 
   const handleAnalyzeWithAI = async (report: Report) => {
@@ -163,6 +243,71 @@ const MarketReports: React.FC<MarketReportsProps> = ({ searchQuery, onSearchChan
     }
   };
 
+  const handleAnalyzeMultiple = async () => {
+    if (!onAnalyzeMultipleWithAI || (selectedQuarterReports.size === 0 && selectedResearchReports.size === 0)) return;
+    
+    setIsAnalyzingMultiple(true);
+    
+    try {
+      // Combine selected reports from both types
+      const selectedQuarterReportObjects = quarterReports.filter(report => selectedQuarterReports.has(report.id));
+      const selectedResearchReportObjects = researchReports.filter(report => selectedResearchReports.has(report.id));
+      const allSelectedReports = [...selectedQuarterReportObjects, ...selectedResearchReportObjects];
+      
+      const pdfDataArray: Array<{ base64: string; filename: string }> = [];
+      
+      for (const report of allSelectedReports) {
+        try {
+          // Download the PDF file
+          const response = await fetch(report.file_url);
+          if (!response.ok) {
+            console.error(`Failed to download PDF: ${report.title}`);
+            continue;
+          }
+          
+          // Convert to ArrayBuffer
+          const arrayBuffer = await response.arrayBuffer();
+          
+          // Convert to base64
+          const bytes = new Uint8Array(arrayBuffer);
+          let binary = '';
+          for (let i = 0; i < bytes.byteLength; i++) {
+            binary += String.fromCharCode(bytes[i]);
+          }
+          const base64Data = btoa(binary);
+          
+          // Get filename from URL
+          const filename = getFileName(report.file_url);
+          
+          pdfDataArray.push({
+            base64: base64Data,
+            filename: filename
+          });
+        } catch (error) {
+          console.error(`Error downloading PDF for ${report.title}:`, error);
+        }
+      }
+      
+      if (pdfDataArray.length > 0) {
+        onAnalyzeMultipleWithAI(pdfDataArray);
+        // Clear all selections after analysis
+        setSelectedQuarterReports(new Set());
+        setSelectedResearchReports(new Set());
+      }
+      
+    } catch (error) {
+      console.error('Error analyzing multiple PDFs:', error);
+    } finally {
+      setIsAnalyzingMultiple(false);
+    }
+  };
+
+  // Calculate total selected reports
+  const totalSelectedReports = selectedQuarterReports.size + selectedResearchReports.size;
+  const isReportSelected = (reportId: string) => {
+    return selectedQuarterReports.has(reportId) || selectedResearchReports.has(reportId);
+  };
+
   return (
     <div className="flex flex-1 gap-4 p-4 overflow-hidden">
       <div className="flex-1 flex flex-col gap-4 overflow-hidden">
@@ -172,6 +317,11 @@ const MarketReports: React.FC<MarketReportsProps> = ({ searchQuery, onSearchChan
               <h2 className="text-2xl font-bold text-[#b9d6ee]">Market Reports</h2>
               <p className="text-sm text-[#b9d6ee]/70 mt-1">
                 {reports.length} reports available
+                {totalSelectedReports > 0 && (
+                  <span className="ml-2 text-[#b9d6ee]">
+                    • {totalSelectedReports} selected
+                  </span>
+                )}
               </p>
             </div>
             <div className="flex gap-2">
@@ -184,6 +334,11 @@ const MarketReports: React.FC<MarketReportsProps> = ({ searchQuery, onSearchChan
                 }`}
               >
                 Quarter Reports
+                {selectedQuarterReports.size > 0 && (
+                  <span className="ml-2 px-2 py-0.5 text-xs bg-[#b9d6ee]/20 rounded-full">
+                    {selectedQuarterReports.size}
+                  </span>
+                )}
               </button>
               <button
                 onClick={() => handleTypeChange('research')}
@@ -194,9 +349,72 @@ const MarketReports: React.FC<MarketReportsProps> = ({ searchQuery, onSearchChan
                 }`}
               >
                 Research
+                {selectedResearchReports.size > 0 && (
+                  <span className="ml-2 px-2 py-0.5 text-xs bg-[#b9d6ee]/20 rounded-full">
+                    {selectedResearchReports.size}
+                  </span>
+                )}
               </button>
             </div>
           </div>
+
+          {totalSelectedReports > 0 && (
+            <div className="mb-4 p-4 bg-gradient-to-r from-[#b9d6ee]/10 to-[#b9d6ee]/5 border border-[#b9d6ee]/20 rounded-lg backdrop-blur-sm">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center justify-center w-8 h-8 bg-[#b9d6ee]/20 rounded-full">
+                    <span className="text-[#b9d6ee] font-semibold text-sm">
+                      {totalSelectedReports}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-[#b9d6ee] font-medium">
+                      {totalSelectedReports} document{totalSelectedReports !== 1 ? 's' : ''} selected
+                    </span>
+                    <p className="text-xs text-[#b9d6ee]/60 mt-0.5">
+                      {selectedQuarterReports.size > 0 && selectedResearchReports.size > 0 
+                        ? `${selectedQuarterReports.size} Quarter + ${selectedResearchReports.size} Research`
+                        : selectedQuarterReports.size > 0 
+                        ? `${selectedQuarterReports.size} Quarter Reports`
+                        : `${selectedResearchReports.size} Research Reports`
+                      } • Ready for AI analysis
+                    </p>
+                  </div>
+                </div>
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => {
+                      setSelectedQuarterReports(new Set());
+                      setSelectedResearchReports(new Set());
+                    }}
+                    className="flex items-center gap-2 px-4 py-2 text-sm bg-red-500/20 text-red-400 rounded-lg hover:bg-red-500/30 transition-all duration-200 border border-red-500/30 hover:border-red-500/50"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                    Clear All
+                  </button>
+                  <button
+                    onClick={handleAnalyzeMultiple}
+                    disabled={isAnalyzingMultiple}
+                    className="flex items-center gap-2 px-4 py-2 text-sm bg-gradient-to-r from-[#b9d6ee]/20 to-[#b9d6ee]/10 text-[#b9d6ee] rounded-lg hover:from-[#b9d6ee]/30 hover:to-[#b9d6ee]/20 transition-all duration-200 border border-[#b9d6ee]/30 hover:border-[#b9d6ee]/50 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-xl"
+                  >
+                    {isAnalyzingMultiple ? (
+                      <>
+                        <div className="animate-spin rounded-full h-4 w-4 border-2 border-[#b9d6ee] border-t-transparent"></div>
+                        <span>Analyzing...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Bot className="w-4 h-4" />
+                        <span>Analyze {totalSelectedReports} with AI</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
 
           <div className="mb-4">
             <div className="flex flex-wrap gap-2 justify-center">
@@ -243,28 +461,44 @@ const MarketReports: React.FC<MarketReportsProps> = ({ searchQuery, onSearchChan
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {reports.map((report) => (
-                  <button
+                  <div
                     key={report.id}
-                    onClick={() => handleReportClick(report)}
-                    className={`glass-panel p-4 rounded-lg hover:bg-white/5 transition-colors text-left ${
+                    className={`glass-panel p-4 rounded-lg hover:bg-white/5 transition-colors text-left relative ${
                       selectedReport?.id === report.id ? 'ring-2 ring-[#b9d6ee]' : ''
-                    }`}
+                    } ${isReportSelected(report.id) ? 'ring-2 ring-[#b9d6ee] bg-[#b9d6ee]/10' : ''}`}
                   >
-                    <div className="flex justify-between items-start mb-2">
-                      <div>
-                        <h3 className="text-lg font-semibold text-[#b9d6ee]">{report.title}</h3>
-                        <p className="text-sm text-[#b9d6ee]/70">{report.stock_symbol}</p>
-                        <p className="text-xs text-[#b9d6ee]/50 mt-1">
-                          {getFileName(report.file_url)}
-                        </p>
-                      </div>
-                      <span className="px-2 py-1 text-xs rounded-full bg-[#b9d6ee]/10 text-[#b9d6ee]">
-                        {report.report_type}
-                      </span>
+                    {/* Selection checkbox */}
+                    <div className="absolute top-2 right-2">
+                      <label className="flex items-center">
+                        <input
+                          type="checkbox"
+                          checked={isReportSelected(report.id)}
+                          onChange={() => handleReportSelection(report.id, selectedType)}
+                          className="w-4 h-4 text-[#b9d6ee] bg-transparent border-[#b9d6ee] rounded focus:ring-[#b9d6ee] focus:ring-2"
+                          title={`Select ${report.title} for AI analysis`}
+                          aria-label={`Select ${report.title} for AI analysis`}
+                        />
+                      </label>
                     </div>
-                    <p className="text-sm text-[#b9d6ee]/70 mb-3 line-clamp-2">
-                      {report.description}
-                    </p>
+
+                    <button
+                      onClick={() => handleReportClick(report)}
+                      className="w-full text-left"
+                    >
+                      <div className="flex justify-between items-start mb-2">
+                        <div className="pr-6">
+                          <h3 className="text-lg font-semibold text-[#b9d6ee]">{report.title}</h3>
+                          <p className="text-sm text-[#b9d6ee]/70">{report.stock_symbol}</p>
+                          <p className="text-xs text-[#b9d6ee]/50 mt-1">
+                            {getFileName(report.file_url)}
+                          </p>
+                        </div>
+                      </div>
+                      <p className="text-sm text-[#b9d6ee]/70 mb-3 line-clamp-2">
+                        {report.description}
+                      </p>
+                    </button>
+
                     <div className="flex justify-between items-center">
                       <span className="text-xs text-[#b9d6ee]/50">
                         {new Date(report.created_at).toLocaleDateString()}
@@ -293,7 +527,7 @@ const MarketReports: React.FC<MarketReportsProps> = ({ searchQuery, onSearchChan
                         </a>
                       </div>
                     </div>
-                  </button>
+                  </div>
                 ))}
               </div>
             )}

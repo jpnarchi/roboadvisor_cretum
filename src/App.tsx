@@ -95,8 +95,11 @@ interface DashboardProps {
   searchQuery: string;
   setSearchQuery: (query: string) => void;
   handleAnalyzeWithAI: (pdfData: { base64: string; filename: string }) => void;
+  handleAnalyzeMultipleWithAI: (pdfDataArray: Array<{ base64: string; filename: string }>) => void;
   externalPdf: { base64: string; filename: string } | null;
+  externalMultiplePdfs: Array<{ base64: string; filename: string }> | null;
   handleExternalPdfProcessed: () => void;
+  handleExternalMultiplePdfsProcessed: () => void;
 }
 
 const SearchDropdown: React.FC<{
@@ -149,8 +152,11 @@ const Dashboard: React.FC<DashboardProps> = ({
   searchQuery,
   setSearchQuery,
   handleAnalyzeWithAI,
+  handleAnalyzeMultipleWithAI,
   externalPdf,
-  handleExternalPdfProcessed
+  externalMultiplePdfs,
+  handleExternalPdfProcessed,
+  handleExternalMultiplePdfsProcessed
 }) => {
   const [searchPosition, setSearchPosition] = useState({ top: 0, left: 0, width: 0 });
   const searchInputRef = React.useRef<HTMLInputElement>(null);
@@ -285,6 +291,8 @@ const Dashboard: React.FC<DashboardProps> = ({
               stocks={stocks}
               externalPdf={externalPdf}
               onExternalPdfProcessed={handleExternalPdfProcessed}
+              externalMultiplePdfs={externalMultiplePdfs}
+              onExternalMultiplePdfsProcessed={handleExternalMultiplePdfsProcessed}
             />
             <RightPanel selectedCompany={selectedCompany} selectedTicker={selectedTicker} />
           </div>
@@ -293,6 +301,7 @@ const Dashboard: React.FC<DashboardProps> = ({
             searchQuery={searchQuery}
             onSearchChange={setSearchQuery}
             onAnalyzeWithAI={handleAnalyzeWithAI}
+            onAnalyzeMultipleWithAI={handleAnalyzeMultipleWithAI}
           />
         )}
       </div>
@@ -311,6 +320,7 @@ const App: React.FC = () => {
   const [isExporting, setIsExporting] = useState(false);
   const [exportProgress, setExportProgress] = useState(0);
   const [externalPdf, setExternalPdf] = useState<{ base64: string; filename: string } | null>(null);
+  const [externalMultiplePdfs, setExternalMultiplePdfs] = useState<Array<{ base64: string; filename: string }> | null>(null);
 
   // EODHD API Key
   const EODHD_API_KEY = "6824b2d80fe347.44604306";
@@ -516,8 +526,17 @@ const App: React.FC = () => {
     setCurrentView('dashboard'); // Cambiar a la vista del dashboard para mostrar el AIAssistant
   };
 
+  const handleAnalyzeMultipleWithAI = (pdfDataArray: Array<{ base64: string; filename: string }>) => {
+    setExternalMultiplePdfs(pdfDataArray);
+    setCurrentView('dashboard'); // Cambiar a la vista del dashboard para mostrar el AIAssistant
+  };
+
   const handleExternalPdfProcessed = () => {
     setExternalPdf(null); // Limpiar el PDF externo después de procesarlo
+  };
+
+  const handleExternalMultiplePdfsProcessed = () => {
+    setExternalMultiplePdfs(null); // Limpiar los PDFs externos después de procesarlos
   };
 
   const handleUpdateData = async () => {
@@ -659,8 +678,11 @@ const App: React.FC = () => {
                 searchQuery={searchQuery}
                 setSearchQuery={setSearchQuery}
                 handleAnalyzeWithAI={handleAnalyzeWithAI}
+                handleAnalyzeMultipleWithAI={handleAnalyzeMultipleWithAI}
                 externalPdf={externalPdf}
+                externalMultiplePdfs={externalMultiplePdfs}
                 handleExternalPdfProcessed={handleExternalPdfProcessed}
+                handleExternalMultiplePdfsProcessed={handleExternalMultiplePdfsProcessed}
               />
             </PrivateRoute>
           }
