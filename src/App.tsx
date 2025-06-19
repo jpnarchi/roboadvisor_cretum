@@ -94,6 +94,9 @@ interface DashboardProps {
   selectedTicker: string | null;
   searchQuery: string;
   setSearchQuery: (query: string) => void;
+  handleAnalyzeWithAI: (pdfData: { base64: string; filename: string }) => void;
+  externalPdf: { base64: string; filename: string } | null;
+  handleExternalPdfProcessed: () => void;
 }
 
 const SearchDropdown: React.FC<{
@@ -144,7 +147,10 @@ const Dashboard: React.FC<DashboardProps> = ({
   selectedCompany,
   selectedTicker,
   searchQuery,
-  setSearchQuery
+  setSearchQuery,
+  handleAnalyzeWithAI,
+  externalPdf,
+  handleExternalPdfProcessed
 }) => {
   const [searchPosition, setSearchPosition] = useState({ top: 0, left: 0, width: 0 });
   const searchInputRef = React.useRef<HTMLInputElement>(null);
@@ -276,7 +282,9 @@ const Dashboard: React.FC<DashboardProps> = ({
           <div className="flex flex-1 gap-4 p-4 overflow-hidden">
             <AIAssistant 
               onCompanySelected={handleCompanySelected} 
-              stocks={stocks} 
+              stocks={stocks}
+              externalPdf={externalPdf}
+              onExternalPdfProcessed={handleExternalPdfProcessed}
             />
             <RightPanel selectedCompany={selectedCompany} selectedTicker={selectedTicker} />
           </div>
@@ -284,6 +292,7 @@ const Dashboard: React.FC<DashboardProps> = ({
           <MarketReports 
             searchQuery={searchQuery}
             onSearchChange={setSearchQuery}
+            onAnalyzeWithAI={handleAnalyzeWithAI}
           />
         )}
       </div>
@@ -301,6 +310,7 @@ const App: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [isExporting, setIsExporting] = useState(false);
   const [exportProgress, setExportProgress] = useState(0);
+  const [externalPdf, setExternalPdf] = useState<{ base64: string; filename: string } | null>(null);
 
   // EODHD API Key
   const EODHD_API_KEY = "6824b2d80fe347.44604306";
@@ -501,6 +511,15 @@ const App: React.FC = () => {
     setSelectedTicker(ticker);
   };
 
+  const handleAnalyzeWithAI = (pdfData: { base64: string; filename: string }) => {
+    setExternalPdf(pdfData);
+    setCurrentView('dashboard'); // Cambiar a la vista del dashboard para mostrar el AIAssistant
+  };
+
+  const handleExternalPdfProcessed = () => {
+    setExternalPdf(null); // Limpiar el PDF externo después de procesarlo
+  };
+
   const handleUpdateData = async () => {
     try {
       // Si hay un ticker seleccionado, actualizar sus datos
@@ -639,6 +658,9 @@ const App: React.FC = () => {
                 selectedTicker={selectedTicker}
                 searchQuery={searchQuery}
                 setSearchQuery={setSearchQuery}
+                handleAnalyzeWithAI={handleAnalyzeWithAI}
+                externalPdf={externalPdf}
+                handleExternalPdfProcessed={handleExternalPdfProcessed}
               />
             </PrivateRoute>
           }

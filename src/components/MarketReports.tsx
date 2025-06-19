@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Download } from 'lucide-react';
+import { Search, Download, Bot } from 'lucide-react';
 import { searchReports } from '../services/supabaseService';
 
 interface Report {
@@ -15,9 +15,10 @@ interface Report {
 interface MarketReportsProps {
   searchQuery: string;
   onSearchChange: (query: string) => void;
+  onAnalyzeWithAI?: (pdfData: { base64: string; filename: string }) => void;
 }
 
-const MarketReports: React.FC<MarketReportsProps> = ({ searchQuery, onSearchChange }) => {
+const MarketReports: React.FC<MarketReportsProps> = ({ searchQuery, onSearchChange, onAnalyzeWithAI }) => {
   const [reports, setReports] = useState<Report[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -126,6 +127,42 @@ const MarketReports: React.FC<MarketReportsProps> = ({ searchQuery, onSearchChan
     setSelectedReport(null); // Reset selected report when changing type
   };
 
+  const handleAnalyzeWithAI = async (report: Report) => {
+    if (!onAnalyzeWithAI) return;
+    
+    try {
+      // Download the PDF file
+      const response = await fetch(report.file_url);
+      if (!response.ok) {
+        throw new Error('Failed to download PDF');
+      }
+      
+      // Convert to ArrayBuffer
+      const arrayBuffer = await response.arrayBuffer();
+      
+      // Convert to base64
+      const bytes = new Uint8Array(arrayBuffer);
+      let binary = '';
+      for (let i = 0; i < bytes.byteLength; i++) {
+        binary += String.fromCharCode(bytes[i]);
+      }
+      const base64Data = btoa(binary);
+      
+      // Get filename from URL
+      const filename = getFileName(report.file_url);
+      
+      // Send to AI Assistant
+      onAnalyzeWithAI({
+        base64: base64Data,
+        filename: filename
+      });
+      
+    } catch (error) {
+      console.error('Error downloading PDF:', error);
+      // You could add a toast notification here
+    }
+  };
+
   return (
     <div className="flex flex-1 gap-4 p-4 overflow-hidden">
       <div className="flex-1 flex flex-col gap-4 overflow-hidden">
@@ -232,15 +269,29 @@ const MarketReports: React.FC<MarketReportsProps> = ({ searchQuery, onSearchChan
                       <span className="text-xs text-[#b9d6ee]/50">
                         {new Date(report.created_at).toLocaleDateString()}
                       </span>
-                      <a
-                        href={report.file_url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        onClick={(e) => e.stopPropagation()}
-                        className="p-1 hover:bg-white/10 rounded transition-colors"
-                      >
-                        <Download className="w-4 h-4 text-[#b9d6ee]" />
-                      </a>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleAnalyzeWithAI(report);
+                          }}
+                          className="flex items-center gap-1 px-2 py-1 hover:bg-white/10 rounded transition-colors text-xs"
+                          title="Analizar con IA"
+                        >
+                          <Bot className="w-3 h-3 text-[#b9d6ee]" />
+                          <span className="text-[#b9d6ee]">Analizar con IA</span>
+                        </button>
+                        <a
+                          href={report.file_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={(e) => e.stopPropagation()}
+                          className="p-1 hover:bg-white/10 rounded transition-colors"
+                          title="Descargar"
+                        >
+                          <Download className="w-4 h-4 text-[#b9d6ee]" />
+                        </a>
+                      </div>
                     </div>
                   </button>
                 ))}

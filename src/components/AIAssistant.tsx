@@ -38,6 +38,11 @@ interface Message {
 interface AIAssistantProps {
   onCompanySelected: (company: string, ticker: string) => void;
   stocks: Array<{ symbol: string; name: string }>;
+  externalPdf?: {
+    base64: string;
+    filename: string;
+  } | null;
+  onExternalPdfProcessed?: () => void;
 }
 
 interface CodeProps {
@@ -46,7 +51,7 @@ interface CodeProps {
   children?: React.ReactNode;
 }
 
-const AIAssistant: React.FC<AIAssistantProps> = ({ onCompanySelected, stocks }) => {
+const AIAssistant: React.FC<AIAssistantProps> = ({ onCompanySelected, stocks, externalPdf, onExternalPdfProcessed }) => {
   /* --------------------------------------------------------------
    *  State
    * -------------------------------------------------------------- */
@@ -65,6 +70,7 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ onCompanySelected, stocks }) 
   // const [sessionId] = useState(() => generateSessionId());
   const [processedPatterns] = useState(new Set<string>());
   const [currentPdf, setCurrentPdf] = useState<{ base64: string; filename: string } | null>(null);
+  const processedExternalPdfRef = React.useRef<string | null>(null);
 
   // Initialize Gemini
   const ai = new GoogleGenerativeAI(import.meta.env.VITE_GEMINI_API_KEY);
@@ -211,6 +217,105 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ onCompanySelected, stocks }) 
     const fallback = exact ?? stocks.find(s => companyName.toLowerCase().includes(s.name.toLowerCase()));
     if (fallback) onCompanySelected(companyName, fallback.symbol);
   }, [chatMessages, stocks, onCompanySelected]);
+
+  /** --------------------------------------------------------------
+   *  Efecto: procesar PDF externo
+   *  -------------------------------------------------------------- */
+  useEffect(() => {
+    if (externalPdf && !isLoading && processedExternalPdfRef.current !== externalPdf.filename) {
+      const analyzeExternalPdf = async () => {
+        // Mark this PDF as being processed
+        processedExternalPdfRef.current = externalPdf.filename;
+        setIsLoading(true);
+        
+        // Add user message with PDF
+        const userMessage: Message = { 
+          role: 'user', 
+          content: `Analiza este documento: ${externalPdf.filename}`,
+          pdfData: externalPdf
+        };
+        setChatMessages(prev => [...prev, userMessage]);
+
+        // Add streaming message
+        const streamingMessage: Message = { 
+          role: 'assistant', 
+          content: '',
+          isStreaming: true 
+        };
+        setChatMessages(prev => [...prev, streamingMessage]);
+
+        try {
+          const model = ai.getGenerativeModel({ model: 'gemini-1.5-flash' });
+          const content = [
+            prompt, // System prompt
+            `Analiza este documento: ${externalPdf.filename}`, // User message
+            {
+              inlineData: {
+                mimeType: 'application/pdf',
+                data: externalPdf.base64
+              }
+            }
+          ];
+
+          const result = await model.generateContentStream(content);
+          let fullResponse = '';
+          let lastUpdate = Date.now();
+          const updateInterval = 50; // Update UI every 50ms
+
+          for await (const chunk of result.stream) {
+            const chunkText = chunk.text();
+            fullResponse += chunkText;
+            
+            // Throttle UI updates for better performance
+            const now = Date.now();
+            if (now - lastUpdate >= updateInterval) {
+              setChatMessages(prev => {
+                const newMessages = [...prev];
+                const lastMessage = newMessages[newMessages.length - 1];
+                if (lastMessage.isStreaming) {
+                  lastMessage.content = fullResponse;
+                }
+                return newMessages;
+              });
+              lastUpdate = now;
+            }
+          }
+
+          // Final update with complete response
+          setChatMessages(prev => {
+            const newMessages = [...prev];
+            newMessages[newMessages.length - 1] = {
+              role: 'assistant',
+              content: fullResponse
+            };
+            return newMessages;
+          });
+          processMessage(fullResponse);
+          
+          // Notify parent that PDF has been processed
+          if (onExternalPdfProcessed) {
+            onExternalPdfProcessed();
+          }
+        } catch (err) {
+          console.error(err);
+          setChatMessages(prev => {
+            const newMessages = [...prev];
+            newMessages[newMessages.length - 1] = {
+              role: 'assistant',
+              content: 'Lo siento, ocurrió un error al analizar el documento.'
+            };
+            return newMessages;
+          });
+        } finally {
+          setIsLoading(false);
+          // Reset the ref after processing
+          processedExternalPdfRef.current = null;
+        }
+      };
+
+      analyzeExternalPdf();
+    }
+  }, [externalPdf, isLoading, ai, prompt, processMessage, onExternalPdfProcessed]);
 
   /** --------------------------------------------------------------
    *  Render
