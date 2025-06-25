@@ -244,7 +244,9 @@ const MarketReports: React.FC<MarketReportsProps> = ({
   };
 
   const handleAnalyzeMultiple = async () => {
-    if (!onAnalyzeMultipleWithAI || (selectedQuarterReports.size === 0 && selectedResearchReports.size === 0)) return;
+    if (!onAnalyzeMultipleWithAI || (selectedQuarterReports.size === 0 && selectedResearchReports.size === 0)) {
+      return;
+    }
     
     setIsAnalyzingMultiple(true);
     

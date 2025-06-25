@@ -70,6 +70,8 @@ const AIAssistant: React.FC<AIAssistantProps> = ({
   const [activePdfs, setActivePdfs] = useState<Array<{ base64: string; filename: string }>>([]);
   
   const processedExternalPdfRef = React.useRef<string | null>(null);
+  // NUEVO: Referencia para evitar procesamiento duplicado de PDFs múltiples
+  const processedExternalMultiplePdfsRef = React.useRef<string | null>(null);
 
   // Initialize Gemini
   const ai = new GoogleGenerativeAI(import.meta.env.VITE_GEMINI_API_KEY);
@@ -296,18 +298,50 @@ const AIAssistant: React.FC<AIAssistantProps> = ({
 
         try {
           const model = ai.getGenerativeModel({ model: 'gemini-1.5-flash' });
-          const content = [
-            prompt,
-            `Analiza este documento: ${externalPdf.filename}`,
-            {
-              inlineData: {
-                mimeType: 'application/pdf',
-                data: externalPdf.base64
-              }
+          
+          // Construir el contenido correctamente para Gemini
+          const content = [];
+          
+          // Incluir historial de mensajes previos (excluyendo system y documentos ya procesados)
+          const filteredMessages = chatMessages.filter(m => 
+            m.role !== 'system' && 
+            !m.content.includes('Analiza este documento') &&
+            !m.content.includes('Contexto: Tengo acceso a los siguientes documentos PDF')
+          );
+          
+          for (const msg of filteredMessages) {
+            content.push({
+              role: msg.role === 'assistant' ? 'model' : 'user',
+              parts: [{ text: msg.content }]
+            });
+          }
+          
+          // Agregar mensaje actual del usuario con el PDF
+          const userParts = [{ text: `Analiza este documento: ${externalPdf.filename}` }];
+          
+          // Agregar el PDF como inlineData
+          console.log('Adding single PDF to Gemini request:', externalPdf.filename, 'Size:', externalPdf.base64.length);
+          userParts.push({
+            inlineData: {
+              mimeType: 'application/pdf',
+              data: externalPdf.base64
             }
-          ];
+          } as any);
+          
+          content.push({
+            role: 'user',
+            parts: userParts
+          });
 
-          const result = await model.generateContentStream(content);
+          console.log('Sending single PDF to Gemini with content structure:', {
+            contentLength: content.length,
+            userPartsLength: userParts.length
+          });
+
+          const result = await model.generateContentStream({
+            contents: content,
+            systemInstruction: prompt
+          });
           let fullResponse = '';
           let lastUpdate = Date.now();
           const updateInterval = 50;
@@ -365,7 +399,10 @@ const AIAssistant: React.FC<AIAssistantProps> = ({
 
   // useEffect para múltiples PDFs externos
   useEffect(() => {
-    if (externalMultiplePdfs && !isLoading) {
+    if (externalMultiplePdfs && !isLoading && processedExternalMultiplePdfsRef.current !== JSON.stringify(externalMultiplePdfs.map(pdf => pdf.filename))) {
+      // Marcar estos PDFs como procesados
+      processedExternalMultiplePdfsRef.current = JSON.stringify(externalMultiplePdfs.map(pdf => pdf.filename));
+      
       // Agregar PDFs externos a la memoria activa
       setActivePdfs(prev => {
         const newPdfs = externalMultiplePdfs.filter(externalPdf => 
@@ -394,18 +431,47 @@ const AIAssistant: React.FC<AIAssistantProps> = ({
         try {
           const model = ai.getGenerativeModel({ model: 'gemini-1.5-flash' });
           
-          const content = [{
+          // Construir el contenido correctamente para Gemini con múltiples PDFs
+          const content = [];
+          
+          // Incluir historial de mensajes previos (excluyendo system y documentos ya procesados)
+          const filteredMessages = chatMessages.filter(m => 
+            m.role !== 'system' && 
+            !m.content.includes('Analiza estos') &&
+            !m.content.includes('Contexto: Tengo acceso a los siguientes documentos PDF')
+          );
+          
+          for (const msg of filteredMessages) {
+            content.push({
+              role: msg.role === 'assistant' ? 'model' : 'user',
+              parts: [{ text: msg.content }]
+            });
+          }
+          
+          // Agregar mensaje actual del usuario con los PDFs
+          const userParts = [{ text: `Analiza estos ${externalMultiplePdfs.length} documentos: ${filenames}` }];
+          
+          // Agregar todos los PDFs como inlineData
+          for (const pdf of externalMultiplePdfs) {
+            console.log('Adding PDF to Gemini request:', pdf.filename, 'Size:', pdf.base64.length);
+            userParts.push({
+              inlineData: {
+                mimeType: 'application/pdf',
+                data: pdf.base64
+              }
+            } as any);
+          }
+          
+          content.push({
             role: 'user',
-            parts: [
-              { text: `Analiza estos ${externalMultiplePdfs.length} documentos: ${filenames}` },
-              ...externalMultiplePdfs.map(pdf => ({
-                inlineData: {
-                  mimeType: 'application/pdf',
-                  data: pdf.base64
-                }
-              } as any))
-            ]
-          }];
+            parts: userParts
+          });
+
+          console.log('Sending to Gemini with content structure:', {
+            contentLength: content.length,
+            userPartsLength: userParts.length,
+            pdfsCount: externalMultiplePdfs.length
+          });
 
           const result = await model.generateContentStream({
             contents: content,
@@ -448,7 +514,7 @@ const AIAssistant: React.FC<AIAssistantProps> = ({
             onExternalMultiplePdfsProcessed();
           }
         } catch (err) {
-          console.error(err);
+          console.error('Error analyzing multiple PDFs:', err);
           setChatMessages(prev => {
             const newMessages = [...prev];
             newMessages[newMessages.length - 1] = {
@@ -459,6 +525,8 @@ const AIAssistant: React.FC<AIAssistantProps> = ({
           });
         } finally {
           setIsLoading(false);
+          // Limpiar la referencia después de procesar
+          processedExternalMultiplePdfsRef.current = null;
         }
       };
 
